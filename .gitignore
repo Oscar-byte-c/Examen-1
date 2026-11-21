@@ -32,7 +32,15 @@ yarn-error.*
 
 # local env files (solo se versiona .env.example)
 .env
+.env.local
 .env*.local
+
+# Supabase CLI: archivos temporales del proyecto vinculado (no se versionan)
+supabase/.temp/
+
+# Claude Code: configuración personal (la compartida es .claude/settings.json)
+.claude/settings.local.json
+CLAUDE.local.md
 
 # typescript
 *.tsbuildinfo

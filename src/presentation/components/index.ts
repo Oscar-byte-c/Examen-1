@@ -1,0 +1,11 @@
+/** Componentes base del sistema de diseño (sin lógica de negocio). */
+export { AppButton, type AppButtonProps, type ButtonSize, type ButtonVariant } from './AppButton';
+export { AppCard, type AppCardProps } from './AppCard';
+export { AppHeader, type AppHeaderProps, type HeaderAction } from './AppHeader';
+export { AppIcon, type IconName } from './AppIcon';
+export { AppInput, type AppInputProps } from './AppInput';
+export { AppText, type AppTextProps } from './AppText';
+export { EmptyState, type EmptyStateProps } from './EmptyState';
+export { LoadingIndicator, type LoadingIndicatorProps } from './LoadingIndicator';
+export { ScreenContainer } from './ScreenContainer';
+export { StatusBadge, type StatusBadgeProps, type StatusKind } from './StatusBadge';

@@ -1,5 +1,6 @@
 /**
  * Constantes de negocio acordadas en el documento consolidado de ADR.
+ * Viven en `domain` porque son reglas del negocio electoral, no configuración técnica.
  */
 
 /** Distancia máxima (en metros) entre el acta y su recinto antes de generar una alerta. No bloquea el registro. */
