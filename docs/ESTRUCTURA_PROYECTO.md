@@ -23,7 +23,7 @@ exam1/
 │   │   ├── entities/         #   Entidades, tipos y errores de dominio (Role, Acta…)
 │   │   ├── repositories/     #   Interfaces (contratos) de repositorios
 │   │   ├── use-cases/        #   Casos de uso (RegistrarActa, AsignarVeedor…)
-│   │   └── constants.ts      #   Reglas de negocio acordadas (umbral de 500 m, dignidades)
+│   │   └── constants.ts      #   Reglas de negocio acordadas (umbral de 300 m (S-06), dignidades)
 │   ├── data/                 # CAPA 2 — implementaciones concretas
 │   │   ├── datasources/
 │   │   │   ├── local/        #   SQLite, File System, Secure Store
@@ -109,7 +109,7 @@ En la fase de autenticación se reemplazará por un store de Zustand alimentado 
 | `.gitignore` | Se agregaron `.env`, `.env.local` y `supabase/.temp/` | Las variables y los temporales de la CLI no se versionan; solo `.env.example`. |
 | `.env` (raíz) | `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `EXPO_PUBLIC_SENTRY_DSN` | Archivo único de variables. Expo inserta las `EXPO_PUBLIC_*` en el bundle al compilar. Tras modificarlo hay que reiniciar Metro (`npx expo start --clear`). |
 | `src/data/datasources/remote/supabaseConfig.ts` | `getSupabaseConfig()` lee y valida URL y publishable key | La conexión a Supabase es responsabilidad de `data`. Usa acceso literal `process.env.EXPO_PUBLIC_*`. La `service_role` nunca va en la app, solo en Edge Functions. |
-| `src/domain/constants.ts` | `GEO_ALERT_THRESHOLD_METERS = 500`, dignidades y número de organizaciones | Acuerdos del consenso: alerta a 500 m sin bloquear el registro. Son reglas de negocio, por eso viven en `domain`. |
+| `src/domain/constants.ts` | `GEO_ALERT_THRESHOLD_METERS = 300`, dignidades y número de organizaciones | Acuerdos del consenso: alerta a más de 300 m sin bloquear el registro (S-06 del documento grupal). Son reglas de negocio, por eso viven en `domain`. |
 | `src/presentation/theme/colors.ts` | Paleta provisional y tipografía ampliada | Colores de la organización (pendientes de definir) y RNF-03 (usabilidad para adultos mayores). |
 
 ### Contenido de la plantilla eliminado

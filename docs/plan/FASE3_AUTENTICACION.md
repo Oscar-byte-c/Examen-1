@@ -1,6 +1,6 @@
 # Fase 3 – Autenticación con Supabase: diseño y plan
 
-**Estado:** propuesta, pendiente de aprobación. **No hay código implementado.**
+**Estado:** implementado y ajustado al documento grupal de ADR (ver `docs/adr/ADR-C02-implementacion-adr-grupal.md`). Las diferencias principales: recuperación por enlace (no OTP), bandera de clave temporal en `app_metadata` y React Hook Form + Zod.
 **ADR aplicables:** Supabase Auth + RLS, Expo Secure Store, Zustand, Expo Router (ADR-C01), cuentas administradas sin registro público, funcionamiento offline.
 
 ---
@@ -231,7 +231,7 @@ El correo **no se duplica**: se toma de `auth.users`, a través de la sesión.
 - Skill `verificar`, agentes `architecture-reviewer` y `security-reviewer`, actualizar `docs/` (resolver la deuda 3.3) y proponer el commit.
 
 ### Fase 3B (siguiente, fuera de este plan)
-Edge Function `crear-usuario` (verifica el rol de quien la llama y valida la cédula con módulo 10), guard de **cambio obligatorio de clave** (`debe_cambiar_clave`), verificación de correo y recuperación de clave por **código OTP**. El modelo de datos de T0 ya lo contempla (`debe_cambiar_clave`, `creado_por`).
+Edge Function `crear-usuario` (verifica el rol de quien la llama y valida la cédula con módulo 10), guard de **cambio obligatorio de clave** (`debe_cambiar_clave`), verificación de correo y recuperación de clave por **enlace** (ADR-02 del documento grupal; antes se había planeado OTP). El modelo de datos de T0 ya lo contempla (`debe_cambiar_clave`, `creado_por`).
 
 ---
 

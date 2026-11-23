@@ -9,3 +9,8 @@ export { EmptyState, type EmptyStateProps } from './EmptyState';
 export { LoadingIndicator, type LoadingIndicatorProps } from './LoadingIndicator';
 export { ScreenContainer } from './ScreenContainer';
 export { StatusBadge, type StatusBadgeProps, type StatusKind } from './StatusBadge';
+export { BarraConexion } from './BarraConexion';
+export { CampoTexto } from './CampoTexto';
+export { MapaOSM, type MarcadorMapa } from './MapaOSM';
+export { OpcionLista } from './OpcionLista';
+export { Retroalimentacion, type TipoRetroalimentacion } from './Retroalimentacion';

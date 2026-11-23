@@ -30,3 +30,8 @@ export function getSupabaseConfig(): SupabaseConfig {
 
   return { url, publishableKey };
 }
+
+/** DSN de Sentry (ADR-05). Es público por diseño (solo permite ENVIAR eventos). Vacío = monitoreo desactivado. */
+export function getSentryDsn(): string | undefined {
+  return process.env.EXPO_PUBLIC_SENTRY_DSN || undefined;
+}

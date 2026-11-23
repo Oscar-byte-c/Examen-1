@@ -1,46 +1,139 @@
-import { ROLE_LABELS, Role } from '@/domain/entities/Role';
-import { AppCard, AppHeader, AppText, EmptyState, ScreenContainer, StatusBadge } from '@/presentation/components';
-import { useSession } from '@/presentation/navigation/SessionPreviewContext';
+import { router } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
 
-/** Inicio del Coordinador Provincial — DEMOSTRACIÓN VISUAL, sin datos electorales. */
+import { DIGNIDAD_LABELS } from '@/domain/entities/Acta';
+import { resumir } from '@/domain/entities/Escrutinio';
+import { ROLE_LABELS, Role } from '@/domain/entities/Role';
+import {
+  AppButton,
+  AppCard,
+  AppHeader,
+  AppText,
+  LoadingIndicator,
+  Retroalimentacion,
+  ScreenContainer,
+  StatusBadge,
+} from '@/presentation/components';
+import { mensajeDeError, useAvance, useConteo, useEscrutinioEnVivo } from '@/presentation/hooks/consultas';
+import { useSession } from '@/presentation/navigation/useSession';
+import { DIGNIDADES_LISTA } from '@/presentation/screens/actas/etiquetas';
+import { colors, radius, spacing } from '@/presentation/theme';
+
+/**
+ * Tablero del coordinador provincial (RF-15, S-02, ADR-07): mesas reportadas, parciales y
+ * faltantes, conteo acumulado por candidato y dignidad, avance por recinto.
+ * Se actualiza en vivo con Supabase Realtime, sin recargar la pantalla.
+ */
 export default function CoordinadorProvincialHomeScreen() {
-  const { signOut } = useSession();
+  const { cerrarSesion } = useSession();
+  const avance = useAvance();
+  const conteo = useConteo();
+  useEscrutinioEnVivo();
+
+  const resumen = avance.data ? resumir(avance.data) : null;
 
   return (
     <ScreenContainer
       header={
         <AppHeader
           eyebrow={ROLE_LABELS[Role.COORDINADOR_PROVINCIAL]}
-          title="Escrutinio provincial"
-          subtitle="Seguimiento de la jornada electoral"
-          icon="map"
-          action={{ icon: 'logout', label: 'Salir', onPress: signOut }}
+          title="Conteo rápido"
+          subtitle="Avance del escrutinio en tiempo real"
+          icon="monitoring"
+          action={{ icon: 'logout', label: 'Salir', onPress: () => void cerrarSesion() }}
         />
       }>
-      <AppCard title="Avance del escrutinio" icon="bar_chart" trailing={<StatusBadge status="neutral" />}>
-        <EmptyState
-          icon="bar_chart"
-          title="Sin actas registradas"
-          description="El avance por recinto y los resultados por candidato se mostrarán aquí en tiempo real."
-        />
+      <View style={styles.botones}>
+        <AppButton label="Mapa de actas" icon="map" variant="outline" onPress={() => router.push('/coordinador-provincial/mapa')} style={styles.boton} />
+        <AppButton label="Recintos" icon="apartment" variant="outline" onPress={() => router.push('/coordinador-provincial/recintos')} style={styles.boton} />
+      </View>
+
+      <AppCard title="Mesas" icon="table_restaurant" trailing={<StatusBadge status="info" label="En vivo" />}>
+        {avance.isPending ? (
+          <LoadingIndicator />
+        ) : avance.isError ? (
+          <Retroalimentacion tipo="error" titulo="No se pudo cargar el avance" mensaje={mensajeDeError(avance.error)} />
+        ) : resumen ? (
+          <View style={styles.cifras}>
+            <Cifra valor={resumen.mesasReportadas} texto="Reportadas" />
+            <Cifra valor={resumen.mesasParciales} texto="Parciales" />
+            <Cifra valor={resumen.mesasFaltantes} texto="Faltan" />
+            <Cifra valor={resumen.mesasTotal} texto="Total" />
+          </View>
+        ) : null}
       </AppCard>
 
-      <AppText variant="label" color="textSecondary">
-        Gestión del territorio
-      </AppText>
+      {DIGNIDADES_LISTA.map((d) => {
+        const filas = (conteo.data ?? []).filter((c) => c.dignidad === d);
+        const total = filas.reduce((s, c) => s + c.votos, 0);
+        return (
+          <AppCard key={d} title={DIGNIDAD_LABELS[d]} subtitle={`${total} votos válidos contados`} icon="how_to_vote">
+            {conteo.isPending ? (
+              <LoadingIndicator />
+            ) : conteo.isError ? (
+              <Retroalimentacion tipo="error" titulo="No se pudo cargar el conteo" mensaje={mensajeDeError(conteo.error)} />
+            ) : (
+              <View style={styles.barras}>
+                {[...filas].sort((a, b) => b.votos - a.votos).map((c) => {
+                  const pct = total > 0 ? (c.votos / total) * 100 : 0;
+                  return (
+                    <View key={c.candidatoId} style={styles.barraFila} accessible accessibilityLabel={`${c.candidato}, ${c.votos} votos, ${pct.toFixed(1)} por ciento`}>
+                      <AppText variant="bodySmall">
+                        Lista {c.lista} · {c.candidato} — <AppText variant="label">{c.votos}</AppText> ({pct.toFixed(1)} %)
+                      </AppText>
+                      <View style={styles.barraFondo}>
+                        <View style={[styles.barra, { width: `${pct}%`, backgroundColor: c.color }]} />
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </AppCard>
+        );
+      })}
 
-      <AppCard
-        title="Recintos electorales"
-        subtitle="Consulta y agrega recintos"
-        icon="apartment"
-        trailing={<StatusBadge status="neutral" />}
-      />
-      <AppCard
-        title="Coordinadores de recinto"
-        subtitle="Crea cuentas y asígnalas a cada recinto"
-        icon="badge"
-        trailing={<StatusBadge status="neutral" />}
-      />
+      <AppCard title="Avance por recinto" icon="apartment">
+        <View style={styles.barras}>
+          {(avance.data ?? []).map((r) => (
+            <View key={r.recintoId} style={styles.recinto}>
+              <AppText variant="bodyStrong" style={styles.flex}>
+                {r.nombre}
+              </AppText>
+              <StatusBadge
+                status={r.mesasReportadas === r.mesasTotal ? 'success' : r.mesasReportadas + r.mesasParciales > 0 ? 'pending' : 'neutral'}
+                label={`${r.mesasReportadas}/${r.mesasTotal} mesas`}
+              />
+            </View>
+          ))}
+        </View>
+      </AppCard>
     </ScreenContainer>
   );
 }
+
+function Cifra({ valor, texto }: { valor: number; texto: string }) {
+  return (
+    <View style={styles.cifra}>
+      <AppText variant="title" color="primary">
+        {valor}
+      </AppText>
+      <AppText variant="caption" color="textSecondary">
+        {texto}
+      </AppText>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  botones: { flexDirection: 'row', gap: spacing.sm },
+  boton: { flex: 1 },
+  cifras: { flexDirection: 'row', justifyContent: 'space-between' },
+  cifra: { alignItems: 'center', flex: 1 },
+  barras: { gap: spacing.sm },
+  barraFila: { gap: spacing.xxs },
+  barraFondo: { height: 12, borderRadius: radius.pill, backgroundColor: colors.surfaceMuted, overflow: 'hidden' },
+  barra: { height: '100%', borderRadius: radius.pill },
+  recinto: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  flex: { flex: 1 },
+});

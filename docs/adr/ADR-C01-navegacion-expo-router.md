@@ -65,7 +65,7 @@ Las rutas de inicio de cada rol están centralizadas en `src/presentation/naviga
 3. **Nuevos guards de flujo**, que van antes que los de rol:
    - `guard={sesion && debeCambiarClave}` → pantalla de cambio obligatorio de clave (RF-03 de Oscar y ADR-03 de Milka).
    - Los grupos de rol solo se habilitan con `!debeCambiarClave` (y con el correo verificado, si se exige).
-   - Recuperación de clave por código OTP, para no depender de deep links.
+   - Recuperación de clave por **enlace** (ADR-02 del documento grupal; ver ADR-C02 §3).
 4. **Cierre de sesión completo.** Además de que el guard pase a `false` (Expo Router elimina ese historial), hay que limpiar la caché de TanStack Query, los stores de Zustand y los tokens de Secure Store. Así ningún dato del usuario anterior queda en memoria.
 5. **Sesión expirada o revocada.** Si el refresh del token falla, la sesión pasa a `null` y los guards llevan al login. Lo que esté en la outbox offline **no debe perderse** al cerrar sesión: se sincroniza o se conserva asociado a su autor.
 6. **Deep links.** El esquema `controlelectoral://` existe. Un enlace a una ruta protegida que no corresponde al rol no la abre (la redirige), pero eso no reemplaza la verificación en el servidor.

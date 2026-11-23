@@ -37,7 +37,23 @@
       "expo-font",
       "expo-image",
       "expo-status-bar",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-secure-store",
+      "expo-sqlite",
+      "@sentry/react-native",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Control Electoral usa la cámara para fotografiar el acta como evidencia.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Control Electoral registra la ubicación al fotografiar el acta para comprobar que fue tomada en el recinto."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

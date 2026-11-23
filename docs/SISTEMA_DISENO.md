@@ -20,7 +20,7 @@ Se importan siempre desde `@/presentation/theme`. Ningún componente usa valores
 | Texto | `text` / `textSecondary` / `textMuted` | #111827 / #4B5563 / #6B7280 | Jerarquía de texto |
 | Bordes | `border` / `divider` | #D1D5DB / #E5E7EB | Campos, tarjetas |
 | Éxito | `success` / `successSoft` | #15803D / #DCFCE7 | Guardado, enviado |
-| Advertencia | `warning` / `warningSoft` | #B45309 / #FEF3C7 | Pendiente, atención (p. ej. alerta de 500 m) |
+| Advertencia | `warning` / `warningSoft` | #B45309 / #FEF3C7 | Pendiente, atención (p. ej. alerta de 300 m) |
 | Error | `error` / `errorSoft` | #B91C1C / #FEE2E2 | Fallos, validaciones |
 | Información | `info` / `infoSoft` | #1D4ED8 / #DBEAFE | En proceso, avisos |
 

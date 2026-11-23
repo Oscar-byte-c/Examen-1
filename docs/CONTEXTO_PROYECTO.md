@@ -1,7 +1,7 @@
 # Contexto del proyecto — Control Electoral
 
 > Documento para **retomar el trabajo desde otra computadora** (o en una sesión nueva de Claude Code).
-> Última actualización: 2026-11-21.
+> Última actualización: 2026-11-22.
 
 ## 1. Qué es y fechas límite
 
@@ -17,59 +17,40 @@ Penalizaciones a tener presentes: sin APK, −5 puntos; no respetar la línea ba
 
 ## 2. Estado actual (qué está hecho)
 
+> **Línea base obligatoria:** el documento grupal `docs/Documento_Consolidado_ADR.docx` (22/11/2026), resumido en `docs/ADR_LINEA_BASE.md`. Cómo se implementó cada ADR: `docs/adr/ADR-C02-implementacion-adr-grupal.md`.
+
 | Fase | Estado |
 |---|---|
-| 1 – Estructura (Clean Architecture, Expo Router, Git) | ✅ |
-| 2 – Sistema de diseño y componentes base | ✅ (colores provisionales) |
-| Reestructura: 3 capas (`domain`, `data`, `presentation`), rutas en `app/` (raíz) | ✅ |
-| Variables de entorno en `.env` (raíz) y lectura en `src/data/datasources/remote/supabaseConfig.ts` | ✅ |
-| Migración a **Expo SDK 57** (requisito obligatorio) | ✅ |
-| 3A – Autenticación: **T0** (backend) | 🟡 La migración `perfiles` + RLS ya está **aplicada** en Supabase; faltan los pasos manuales (ver §4) |
-| 3A – T1 a T8 | ⏳ Pendiente (plan aprobado en `docs/plan/FASE3_AUTENTICACION.md`) |
-| 3B – Alta de cuentas, cambio de clave, OTP | ⏳ Pendiente |
-| Fases siguientes: territorio, actas (foto, GPS, offline, outbox), dashboard en tiempo real, Sentry, APK | ⏳ Pendiente |
+| Estructura, sistema de diseño, 3 capas, SDK 57 | ✅ |
+| Alineación con el documento grupal (umbral 300 m, enlaces en vez de OTP, bandera en `app_metadata`, RHF + Zod) | ✅ Documentada (ADR_LINEA_BASE §4.8 y ADR-C02) |
+| Backend: migración `20261122120000_territorio_actas.sql` (recintos, mesas, asignaciones, organizaciones, candidatos, actas, votos, historial, conflictos, RLS, RPC, Storage, Realtime) | ✅ Escrita · ⏳ **sin aplicar** en Supabase |
+| Seed (Pichincha–Quito, 5 recintos × 4 mesas, 5 organizaciones ficticias, usuarios de prueba) | ✅ Escrito · ⏳ sin aplicar |
+| Edge Functions `crear-usuario`, `cambiar-clave`, `solicitar-recuperacion` | ✅ Escritas · ⏳ **sin desplegar** |
+| App: login, sesión offline, cambio obligatorio de clave, recuperación por enlace | ✅ Código · ⏳ sin probar en dispositivo |
+| App: veedor (mesas, acta con RHF + Zod, cámara, nitidez, GPS, SQLite + outbox, sincronización automática) | ✅ Código · ⏳ sin probar en dispositivo |
+| App: coordinador de recinto (mesas, asignar/reasignar, veedor sustituto, corregir actas, conflictos) | ✅ Código · ⏳ sin probar en dispositivo |
+| App: coordinador provincial (dashboard en vivo, recintos, crear coordinador, mapa OSM con alertas > 300 m) | ✅ Código · ⏳ sin probar en dispositivo |
+| Sentry con filtro de datos personales | ✅ Código · ⏳ falta el DSN en `.env` |
+| Verificación local: `tsc` ✅ · 25 tests de dominio ✅ · expo-doctor 21/21 ✅ · bundle Android ✅ | ✅ |
+| Colores oficiales de la organización (RNF-06) | ⏳ Pendiente del equipo (paleta provisional) |
+| APK final (EAS, perfil `preview`) | ⏳ Al final |
 
-## 3. Decisiones aprobadas (resumen)
+## 3. Decisiones clave (resumen)
 
-La referencia completa está en `docs/ADR_LINEA_BASE.md` y `docs/adr/`.
+- **Seguridad:** la app solo LEE (filtrado por RLS). Toda escritura pasa por RPC `SECURITY DEFINER` que revalidan rol, ámbito y datos (`sincronizar_acta`, `resolver_conflicto`, `crear_recinto`, `asignar_mesa`) o por Edge Functions (alta de cuentas y claves). El provincial no edita actas.
+- **Clave temporal (ADR-01):** `app_metadata.debe_cambiar_clave`. Mientras sea `true`, `privado.mi_rol()` devuelve `null` y la RLS no entrega datos.
+- **Sincronización (ADR-03/10):** SQLite (`actas_locales`, `outbox`, `cache`) + UUID por operación + RPC idempotente. Versión base por acta: si no coincide, el servidor guarda ambas versiones en `actas_conflictos` (S-04).
+- **Evidencia (ADR-04):** foto solo con la cámara de la app; nitidez por varianza del laplaciano (`NITIDEZ_MINIMA = 60`, **calibrar con fotos reales**); 3 lecturas de GPS y se guarda la más precisa. El GPS es obligatorio; la distancia la calcula el servidor; alerta > 300 m sin bloqueo.
+- **Mapa:** WebView + Leaflet + teselas de OpenStreetMap.
 
-- **Stack:** Expo SDK 57 · Expo Router (incluye React Navigation) · Supabase (Auth, PostgreSQL, RLS, Storage, Realtime, Edge Functions) · Secure Store · SQLite + File System · NetInfo · Zustand + TanStack Query · Camera, Image Manipulator, Location · OpenStreetMap · Sentry · Lottie + Reanimated.
-- **Arquitectura:** solo tres capas en `src/`: `domain` (TypeScript puro), `data` (incluye `di/container.ts`) y `presentation`. Las rutas viven en `app/` (raíz) y solo re-exportan pantallas.
-- **Seguridad:**
-  - El rol sale solo de la tabla `perfiles` (con RLS), nunca de `user_metadata`.
-  - Cada usuario solo lee su propia fila; nadie puede modificar su rol.
-  - No hay registro público.
-  - En la app solo va la publishable key; la `service_role` nunca.
-- **Aprobado para la Fase 3:**
-  - P1: migraciones con la CLI, versionadas.
-  - P2: división en 3A/3B.
-  - P3: `jest-expo` para tests de dominio.
-  - P4: instalar de una vez las dependencias nativas del ADR.
-  - P5: eliminar la vista previa de roles.
-- **Condiciones del estudiante para la Fase 3:**
-  - Roles asignados solo por mecanismos administrativos.
-  - RLS que impida ver o modificar perfiles ajenos y cambiar los propios privilegios.
-  - La caché del perfil solo sirve para la interfaz offline.
-  - El servidor revalida todo lo que se sincroniza.
-  - El cierre de sesión limpia la sesión local aunque no haya red.
-- **Acuerdos de negocio:**
-  - Alerta GPS a 500 m del recinto, sin bloquear el registro.
-  - Los conflictos de sincronización se conservan y se registran.
-  - Funcionamiento offline.
+## 4. Próximos pasos inmediatos (acciones del estudiante)
 
-## 4. Próximos pasos inmediatos
-
-1. **T0 – pasos manuales en el panel de Supabase:**
-   1. Authentication → Sign In / Providers → **Allow new users to sign up = OFF**.
-   2. Authentication → Users → *Add user* (con **Auto Confirm**), usando la misma clave para los tres:
-      - `provincial.prueba@example.com`
-      - `recinto.prueba@example.com`
-      - `veedor.prueba@example.com`
-   3. Crear `.env.test.local` con `PRUEBA_CLAVE_USUARIOS=<esa clave>`.
-   4. Ejecutar `npm run db:push`, que aplica el seed con los roles, y luego `npm run test:rls`, que debe mostrar todas las verificaciones como PASA.
-2. **T1 – Fase 3A:** instalar las dependencias nativas del ADR con `npx expo install`, configurar `jest-expo` y preparar el development build.
-3. Continuar con T2–T8 según el plan.
-4. Pendientes del equipo: colores oficiales de la organización y la librería de mapas OSM (línea base 3.4).
+1. Crear `.env` (Project URL + publishable key; opcional el DSN de Sentry) y `.env.test.local`.
+2. `npx supabase login` y `npx supabase link --project-ref <REF>`.
+3. Panel de Supabase: *Allow new users to sign up* = OFF; *Confirm email* = ON; crear los 3 usuarios de prueba con *Auto Confirm*; *URL Configuration → Redirect URLs*: `controlelectoral://**` (y, solo durante las pruebas en Expo Go, la URL `exp://` de tu equipo); (ADR-02) SMTP personalizado y plantillas en español.
+4. `npm run db:push` (migraciones + seed) → `npm run functions:deploy` → `npm run test:rls` (todas deben PASAR). Solo para probar los enlaces de correo en Expo Go: `npx supabase secrets set PERMITIR_EXPO_GO=true` (quitarlo antes de entregar; ver ADR-C02 §3).
+5. Probar en Expo Go (`npm run start:go`) con los 3 roles.
+6. Al final: colores oficiales, calibrar la nitidez y generar el APK con `npm run build:apk`.
 
 ## 5. Configurar una computadora nueva
 
