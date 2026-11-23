@@ -1,9 +1,11 @@
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { DIGNIDAD_LABELS } from '@/domain/entities/Acta';
 import { resumir } from '@/domain/entities/Escrutinio';
 import { ROLE_LABELS, Role } from '@/domain/entities/Role';
+import { container } from '@/data/di/container';
 import {
   AppButton,
   AppCard,
@@ -108,7 +110,34 @@ export default function CoordinadorProvincialHomeScreen() {
           ))}
         </View>
       </AppCard>
+
+      <PruebaMonitoreo />
     </ScreenContainer>
+  );
+}
+
+/**
+ * ADR-05 / RF-17: envía un error de prueba al monitoreo para demostrar que los fallos llegan.
+ * Esta pantalla solo existe en el grupo de rutas del coordinador provincial (guard por rol).
+ */
+function PruebaMonitoreo() {
+  const [eventoId, setEventoId] = useState<string | null | undefined>(undefined);
+
+  return (
+    <AppCard title="Monitoreo de fallos" subtitle="Envía un error de prueba a Sentry" icon="bug_report">
+      <AppButton
+        label="Probar monitoreo"
+        icon="send"
+        variant="outline"
+        accessibilityHint="Envía un error de prueba a la herramienta de monitoreo"
+        onPress={() => setEventoId(container.probarMonitoreo.execute())}
+      />
+      {eventoId === undefined ? null : eventoId ? (
+        <Retroalimentacion tipo="exito" titulo="Error de prueba enviado" mensaje={`Búscalo en Sentry con el identificador ${eventoId}.`} />
+      ) : (
+        <Retroalimentacion tipo="error" titulo="El monitoreo no está configurado" mensaje="Falta el DSN de Sentry en la configuración de la app." />
+      )}
+    </AppCard>
   );
 }
 

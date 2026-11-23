@@ -21,9 +21,11 @@ Cada punto sigue el formato **problema → alternativas → decisión → consec
 - **Flujo:** `crear-usuario` (Edge Function, con `service_role` solo en el servidor):
   1. Verifica el JWT de quien llama y su rol en `perfiles`: el provincial crea coordinadores de recinto (en un recinto sin coordinador) y el coordinador de recinto crea veedores de su propio recinto.
   2. Valida cédula (módulo 10), nombres, apellidos, teléfono y correo con las mismas reglas del dominio.
-  3. `auth.admin.inviteUserByEmail()`: Supabase envía el **enlace de verificación** (único y con expiración). Sin verificar el correo no se puede iniciar sesión (`email_not_confirmed`).
-  4. Genera una **clave temporal aleatoria** y marca `debe_cambiar_clave = true`. La clave se muestra **una sola vez** a quien crea la cuenta, que se la entrega al titular. No se guarda ni se registra en logs.
-  5. Inserta el perfil. Si algo falla, borra el usuario de Auth (no quedan cuentas a medias).
+  3. Genera una **clave temporal aleatoria** y crea la cuenta con `auth.admin.createUser({ password, email_confirm: false, app_metadata: { debe_cambiar_clave: true } })`, que no envía correo. La clave se muestra **una sola vez** a quien crea la cuenta, que se la entrega al titular. No se guarda ni se registra en logs.
+  4. Inserta el perfil.
+  5. **Al final**, `auth.admin.inviteUserByEmail()`: para un usuario existente sin confirmar, Supabase envía el **enlace de verificación** (único y con expiración) sin modificar su clave ni su `app_metadata`. Sin verificar el correo no se puede iniciar sesión (`email_not_confirmed`). Si algo falla, borra el usuario de Auth (el perfil cae en cascada): no quedan cuentas a medias.
+- **Por qué este orden (corrección del 22/11):** en Supabase Auth, asignar una clave (`UpdatePassword`) **borra el token de confirmación**. La versión anterior invitaba primero y asignaba la clave después, así que el enlace llegaba ya inválido (`otp_expired: Email link is invalid or has expired`).
+- **Destino del enlace:** el `redirectTo` lo envía la app (`Linking.createURL('/correo-verificado')`) y la función solo lo acepta si es `controlelectoral://` o, durante las pruebas, `exp://` con `PERMITIR_EXPO_GO=true`. Además, debe estar en *Authentication → URL Configuration → Redirect URLs*; si no, Supabase usa el *Site URL* (por defecto `http://localhost:3000`). La verificación ocurre en el servidor **antes** de redirigir: aunque la redirección falle, el correo ya quedó verificado si el token era válido.
 - **SMTP personalizado (ADR-02):** se configura en el panel de Supabase (Authentication → Emails → SMTP Settings), con las plantillas en español. Las credenciales SMTP nunca están en el repositorio ni en la app.
 
 ## 3. Recuperación de clave por enlace (ADR-02, RF-04)
@@ -74,3 +76,11 @@ Cada punto sigue el formato **problema → alternativas → decisión → consec
 ## 8. Datos precargados (RF-05)
 
 - El documento no indica la provincia ni el cantón. Se usan **Pichincha – Quito**, coherente con las cédulas de prueba (código de provincia 17). Las 5 organizaciones y sus candidatos son **ficticios**, para no usar nombres reales de partidos. Las coordenadas de los recintos son aproximadas.
+
+## 9. Plataforma objetivo: Android. Web no soportada (RNF-02, ADR-01)
+
+- **Problema:** `npx expo start --web` falla porque `expo-secure-store` **no tiene implementación web**: su módulo web está vacío (`getValueWithKeyAsync is not a function`). La sesión de Supabase guarda sus tokens en Secure Store (RNF-02), que en Android los cifra con el Keystore.
+- **Alternativas:** (a) aceptar que la app no corre en navegador; (b) un adaptador solo web sobre `localStorage`.
+- **Decisión (23/11/2026, del estudiante):** **(a)**. El enunciado exige un APK de Android y ni el documento grupal ni los requerimientos piden versión web. La opción (b) dejaría los tokens en texto plano en el navegador, lo que contradice RNF-02, así que se descarta.
+- **Consecuencia:** la app **se valida en Android**: Expo Go durante el desarrollo y el APK (perfil `preview`) en la entrega. La web no forma parte del alcance.
+- `metro.config.js` solo añade lo que expo-sqlite exige en web: `wasm` en `assetExts` y las cabeceras COOP/COEP (docs SDK 57). Se conserva porque es inocuo: el bundle Android no incluye ningún `.wasm` ni wa-sqlite (comprobado con `expo export --platform android`).

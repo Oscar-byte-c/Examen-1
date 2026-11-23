@@ -38,6 +38,7 @@ import {
   ResolverConflicto,
   SuscribirseEscrutinio,
 } from '@/domain/use-cases/escrutinio';
+import { ProbarMonitoreo } from '@/domain/use-cases/monitoreo';
 import {
   AsignarMesa,
   CrearRecinto,
@@ -108,6 +109,7 @@ export const container = {
 
   // Servicios transversales
   monitoreo,
+  probarMonitoreo: new ProbarMonitoreo(monitoreo), // demo de RF-17 (solo coordinador provincial)
   /** UUID v4 generado en el cliente (ADR-10). */
   nuevoId: (): string => randomUUID(),
 } as const;

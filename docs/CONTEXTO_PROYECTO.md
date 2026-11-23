@@ -17,20 +17,22 @@ Penalizaciones a tener presentes: sin APK, −5 puntos; no respetar la línea ba
 
 ## 2. Estado actual (qué está hecho)
 
+> **Rama de trabajo:** `feature/alineacion-adr-grupal` (commit `f589fe9`, sin fusionar en `main` ni subir a GitHub). Guía compacta para cada sesión: skill `.claude/skills/examen-1`.
+>
 > **Línea base obligatoria:** el documento grupal `docs/Documento_Consolidado_ADR.docx` (22/11/2026), resumido en `docs/ADR_LINEA_BASE.md`. Cómo se implementó cada ADR: `docs/adr/ADR-C02-implementacion-adr-grupal.md`.
 
 | Fase | Estado |
 |---|---|
 | Estructura, sistema de diseño, 3 capas, SDK 57 | ✅ |
 | Alineación con el documento grupal (umbral 300 m, enlaces en vez de OTP, bandera en `app_metadata`, RHF + Zod) | ✅ Documentada (ADR_LINEA_BASE §4.8 y ADR-C02) |
-| Backend: migración `20261122120000_territorio_actas.sql` (recintos, mesas, asignaciones, organizaciones, candidatos, actas, votos, historial, conflictos, RLS, RPC, Storage, Realtime) | ✅ Escrita · ⏳ **sin aplicar** en Supabase |
-| Seed (Pichincha–Quito, 5 recintos × 4 mesas, 5 organizaciones ficticias, usuarios de prueba) | ✅ Escrito · ⏳ sin aplicar |
-| Edge Functions `crear-usuario`, `cambiar-clave`, `solicitar-recuperacion` | ✅ Escritas · ⏳ **sin desplegar** |
+| Backend: migración `20261122120000_territorio_actas.sql` (recintos, mesas, asignaciones, organizaciones, candidatos, actas, votos, historial, conflictos, RLS, RPC, Storage, Realtime) | ✅ Aplicada en Supabase (22/11), junto con `20261122110000_retirar_territorio_previo.sql` |
+| Seed (Pichincha–Quito, 5 recintos × 4 mesas, 5 organizaciones ficticias, usuarios de prueba) | ✅ Aplicado (22/11): 5 recintos, 20 mesas, 5 organizaciones, 10 candidatos, 3 perfiles, 2 asignaciones |
+| Edge Functions `crear-usuario`, `cambiar-clave`, `solicitar-recuperacion` | ✅ Desplegadas (22/11) |
 | App: login, sesión offline, cambio obligatorio de clave, recuperación por enlace | ✅ Código · ⏳ sin probar en dispositivo |
 | App: veedor (mesas, acta con RHF + Zod, cámara, nitidez, GPS, SQLite + outbox, sincronización automática) | ✅ Código · ⏳ sin probar en dispositivo |
 | App: coordinador de recinto (mesas, asignar/reasignar, veedor sustituto, corregir actas, conflictos) | ✅ Código · ⏳ sin probar en dispositivo |
 | App: coordinador provincial (dashboard en vivo, recintos, crear coordinador, mapa OSM con alertas > 300 m) | ✅ Código · ⏳ sin probar en dispositivo |
-| Sentry con filtro de datos personales | ✅ Código · ⏳ falta el DSN en `.env` |
+| Sentry con filtro de datos personales | ✅ Código · DSN y `SENTRY_AUTH_TOKEN` en `.env.local` (local) · una sola inicialización (`MonitoreoSentry`); se descartaron los añadidos del Wizard (Replay, Feedback, Logs, `sendDefaultPii`) · botón **«Probar monitoreo»** en el tablero del provincial (caso de uso `ProbarMonitoreo`, tag `tarea: prueba_monitoreo`) · ⏳ variables de EAS para el APK |
 | Verificación local: `tsc` ✅ · 25 tests de dominio ✅ · expo-doctor 21/21 ✅ · bundle Android ✅ | ✅ |
 | Colores oficiales de la organización (RNF-06) | ⏳ Pendiente del equipo (paleta provisional) |
 | APK final (EAS, perfil `preview`) | ⏳ Al final |
@@ -46,10 +48,17 @@ Penalizaciones a tener presentes: sin APK, −5 puntos; no respetar la línea ba
 ## 4. Próximos pasos inmediatos (acciones del estudiante)
 
 1. Crear `.env` (Project URL + publishable key; opcional el DSN de Sentry) y `.env.test.local`.
-2. `npx supabase login` y `npx supabase link --project-ref <REF>`.
+2. ✅ (22/11) CLI autenticada y vinculada al proyecto **`Examen-1` (ref `lhehzeccskdknwmvnvgo`)**. `wjyyauyrnrpnubkijqnh` es el ID de la **organización** "Examen1", no un proyecto (por eso fallaba `link`).
+   - El remoto tenía aplicada una migración `20261121230000_territorio` de una iteración previa al ADR grupal que no estaba en el repo. Se recuperó con `migration fetch` y se añadió `20261122110000_retirar_territorio_previo.sql`, que la deshace (solo datos de prueba; las cuentas de Auth no se tocan y el seed recrea los perfiles). Ensayo con `BEGIN…ROLLBACK` y `db push` aplicados el 22/11.
+   - **Ojo:** si el seed ya figura en el historial, `db push --include-seed` solo actualiza su hash y **no lo ejecuta**. Para reejecutarlo (es idempotente): `npx supabase db query --remote -f supabase/seed.sql`.
+   - Advisors: el aviso *SECURITY DEFINER ejecutable por authenticated* en `sincronizar_acta`, `resolver_conflicto`, `crear_recinto` y `asignar_mesa` es intencional (las funciones revalidan rol y ámbito). Pendiente en el panel: *Leaked password protection*.
+   - Estado remoto antes del push: 4 cuentas de Auth (`provincial`, `recinto`, `veedor` y `nuevo.prueba@example.com`), solo `cambiar-clave` desplegada (versión antigua), sin bucket `fotos-actas`.
 3. Panel de Supabase: *Allow new users to sign up* = OFF; *Confirm email* = ON; crear los 3 usuarios de prueba con *Auto Confirm*; *URL Configuration → Redirect URLs*: `controlelectoral://**` (y, solo durante las pruebas en Expo Go, la URL `exp://` de tu equipo); (ADR-02) SMTP personalizado y plantillas en español.
 4. `npm run db:push` (migraciones + seed) → `npm run functions:deploy` → `npm run test:rls` (todas deben PASAR). Solo para probar los enlaces de correo en Expo Go: `npx supabase secrets set PERMITIR_EXPO_GO=true` (quitarlo antes de entregar; ver ADR-C02 §3).
-5. Probar en Expo Go (`npm run start:go`) con los 3 roles.
+   - ✅ (22/11) `.env` y `.env.test.local` creados por el estudiante · `npm run test:rls`: **27/27 PASAN** · `tsc` ✅ · jest 26/26 ✅ · expo-doctor 21/21 ✅ · `expo lint` sin configurar (ESLint no instalado). Falta `EXPO_PUBLIC_SENTRY_DSN` (necesario para la demo de fallos de la rúbrica, 1 punto).
+5. Probar en Expo Go (`npm run start:go`) con los 3 roles. ⏳ En curso (22/11).
+   - Web (23/11, opcional; la entrega es el APK Android): `metro.config.js` añade `wasm` a `assetExts` y las cabeceras COOP/COEP que expo-sqlite exige en web (docs SDK 57). El bundle web compila, pero `expo-secure-store` no tiene implementación web. **Decisión (23/11): web NO soportada; la app se valida en Android** (Expo Go y APK). No se usa `localStorage` para tokens (RNF-02). Ver ADR-C02 §9.
+   - 🐞 (22/11) Invitación con `otp_expired` y redirección a `localhost:3000`. Causa: `crear-usuario` asignaba la clave **después** de invitar y en Supabase Auth cambiar la clave borra el token de confirmación. Además faltaba `PERMITIR_EXPO_GO`, así que se usaba el *Site URL*. Corregido en el código (ver ADR-C02 §2). ⏳ Falta desplegar `crear-usuario`, activar el secreto, añadir la *Redirect URL* `exp://…` y reenviar la invitación al coordinador ya creado (su perfil y su recinto se conservan).
 6. Al final: colores oficiales, calibrar la nitidez y generar el APK con `npm run build:apk`.
 
 ## 5. Configurar una computadora nueva

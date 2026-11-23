@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { validarCedula } from './cedula';
+import { errorCedula, type ErrorCedula } from './cedula';
 import type { Role } from './Role';
 
 /** Usuario autenticado. El rol sale de la tabla `perfiles` (RLS), nunca de user_metadata. */
@@ -66,12 +66,24 @@ const nombreSchema = z
   .transform((s) => s.replace(/\s+/g, ' '))
   .pipe(z.string().regex(/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' ]{2,60}$/, 'Solo letras (mínimo 2).'));
 
+/** Mensaje para la persona según la regla de la cédula que no se cumple (RF-02). */
+export const MENSAJES_CEDULA: Record<ErrorCedula, string> = {
+  longitud: 'La cédula debe tener exactamente 10 dígitos.',
+  provincia: 'El código de provincia no es válido.',
+  tercer_digito: 'El tercer dígito de la cédula no es válido.',
+  verificador: 'El dígito verificador no coincide.',
+};
+
 /** RF-02: datos de una cuenta nueva. */
 export const nuevoUsuarioSchema = z.object({
   cedula: z
     .string()
     .trim()
-    .refine(validarCedula, 'Cédula no válida: revisa los 10 dígitos.'),
+    // superRefine (en vez de refine) permite elegir el mensaje según la causa del error.
+    .superRefine((cedula, ctx) => {
+      const error = errorCedula(cedula);
+      if (error) ctx.addIssue({ code: 'custom', message: MENSAJES_CEDULA[error] });
+    }),
   nombres: nombreSchema,
   apellidos: nombreSchema,
   telefono: z.string().trim().regex(/^09\d{8}$/, 'Celular de 10 dígitos que empiece con 09.'),

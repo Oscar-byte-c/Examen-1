@@ -156,6 +156,10 @@ create table public.actas_conflictos (
   resuelto_en       timestamptz null
 );
 create index conflictos_mesa_idx on public.actas_conflictos (mesa_id) where estado = 'pendiente';
+-- Índices en claves foráneas usadas por RLS y joins (supabase-postgres-best-practices).
+create index conflictos_acta_idx on public.actas_conflictos (acta_id);
+create index perfiles_recinto_idx on public.perfiles (recinto_id);
+create index asignaciones_mesa_idx on public.asignaciones_mesa (mesa_id);
 
 -- -----------------------------------------------------------------------------
 -- 4. Funciones auxiliares de autorización (SECURITY DEFINER, search_path vacío).
@@ -270,13 +274,13 @@ alter table public.actas_conflictos  enable row level security;
 create policy "perfiles_supervision_lectura" on public.perfiles
   for select to authenticated
   using (
-    privado.mi_rol() = 'coordinador_provincial'
-    or (privado.mi_rol() = 'coordinador_recinto' and rol = 'veedor' and recinto_id = privado.mi_recinto())
+    (select privado.mi_rol()) = 'coordinador_provincial'
+    or ((select privado.mi_rol()) = 'coordinador_recinto' and rol = 'veedor' and recinto_id = (select privado.mi_recinto()))
   );
 
 create policy "recintos_lectura" on public.recintos
   for select to authenticated
-  using (privado.mi_rol() = 'coordinador_provincial' or id = privado.mi_recinto());
+  using ((select privado.mi_rol()) = 'coordinador_provincial' or id = (select privado.mi_recinto()));
 
 create policy "mesas_lectura" on public.mesas
   for select to authenticated
@@ -285,16 +289,16 @@ create policy "mesas_lectura" on public.mesas
 create policy "asignaciones_lectura" on public.asignaciones_mesa
   for select to authenticated
   using (
-    privado.mi_rol() = 'coordinador_provincial'
-    or (privado.mi_rol() = 'veedor' and veedor_id = (select auth.uid()) and revocado_en is null)
-    or (privado.mi_rol() = 'coordinador_recinto' and privado.puede_ver_mesa(mesa_id))
+    (select privado.mi_rol()) = 'coordinador_provincial'
+    or ((select privado.mi_rol()) = 'veedor' and veedor_id = (select auth.uid()) and revocado_en is null)
+    or ((select privado.mi_rol()) = 'coordinador_recinto' and privado.puede_ver_mesa(mesa_id))
   );
 
 create policy "organizaciones_lectura" on public.organizaciones
-  for select to authenticated using (privado.mi_rol() is not null);
+  for select to authenticated using ((select privado.mi_rol()) is not null);
 
 create policy "candidatos_lectura" on public.candidatos
-  for select to authenticated using (privado.mi_rol() is not null);
+  for select to authenticated using ((select privado.mi_rol()) is not null);
 
 create policy "actas_lectura" on public.actas
   for select to authenticated using (privado.puede_ver_mesa(mesa_id));
@@ -307,14 +311,14 @@ create policy "votos_lectura" on public.votos_acta
 create policy "historial_lectura" on public.actas_historial
   for select to authenticated
   using (
-    privado.mi_rol() in ('coordinador_provincial', 'coordinador_recinto')
+    (select privado.mi_rol()) in ('coordinador_provincial', 'coordinador_recinto')
     and exists (select 1 from public.actas a where a.id = acta_id and privado.puede_ver_mesa(a.mesa_id))
   );
 
 create policy "conflictos_lectura" on public.actas_conflictos
   for select to authenticated
   using (
-    privado.mi_rol() in ('coordinador_provincial', 'coordinador_recinto')
+    (select privado.mi_rol()) in ('coordinador_provincial', 'coordinador_recinto')
     and privado.puede_ver_mesa(mesa_id)
   );
 

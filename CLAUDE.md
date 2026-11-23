@@ -68,5 +68,5 @@ Windows 10 con PowerShell 5.1 (sin `&&`; usa `;` o `if ($?)`). Node en `C:\Progr
 
 ## Documentación
 
-**Al iniciar una sesión, lee primero `docs/CONTEXTO_PROYECTO.md`** (estado actual, decisiones aprobadas y tarea pendiente). Otros documentos: `docs/plan/` (planes aprobados) · `docs/ESTRUCTURA_PROYECTO.md` (estructura y configuración) · `docs/SISTEMA_DISENO.md` (UI) · `docs/ADR_LINEA_BASE.md` y `docs/adr/` (decisiones).
+**Al iniciar una sesión, usa la skill `examen-1` (reglas compactas y prioridad de documentos) y lee `docs/CONTEXTO_PROYECTO.md`** (estado actual, decisiones aprobadas y tarea pendiente). Otros documentos: `docs/plan/` (planes aprobados) · `docs/ESTRUCTURA_PROYECTO.md` (estructura y configuración) · `docs/SISTEMA_DISENO.md` (UI) · `docs/ADR_LINEA_BASE.md` y `docs/adr/` (decisiones).
 Mantén la documentación coherente con el código y **actualiza `CONTEXTO_PROYECTO.md` al cerrar cada tarea o fase**: la memoria de Claude y el historial de conversaciones no viajan con el repositorio.

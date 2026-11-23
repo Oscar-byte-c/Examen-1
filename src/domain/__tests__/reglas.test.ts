@@ -6,11 +6,12 @@ import { describe, expect, it } from '@jest/globals';
 
 import { NITIDEZ_MINIMA } from '../constants';
 import { crearFormularioActaSchema, resumenSuma, validarResultados } from '../entities/Acta';
-import { validarCedula } from '../entities/cedula';
+import { errorCedula, validarCedula } from '../entities/cedula';
 import { resumir } from '../entities/Escrutinio';
 import { distanciaMetros, fueraDeRango, mejorLectura } from '../entities/geo';
 import { esFotoLegible, varianzaLaplaciano } from '../entities/nitidez';
 import { estadoReporte } from '../entities/Territorio';
+import { ProbarMonitoreo, TAREA_PRUEBA_MONITOREO } from '../use-cases/monitoreo';
 import { loginSchema, nuevaClaveSchema, nuevoUsuarioSchema } from '../entities/Usuario';
 
 describe('Cédula ecuatoriana (RF-02)', () => {
@@ -25,6 +26,18 @@ describe('Cédula ecuatoriana (RF-02)', () => {
     ['2512345678', 'provincia inexistente (25)'],
     ['1762345675', 'tercer dígito ≥ 6'],
   ])('rechaza %s (%s)', (c) => expect(validarCedula(c)).toBe(false));
+
+  it.each([
+    ['1712345676', 'verificador'],
+    ['171234567', 'longitud'],
+    ['17123456789', 'longitud'],
+    ['17123456AB', 'longitud'],
+    ['2512345678', 'provincia'],
+    ['0012345678', 'provincia'],
+    ['1762345675', 'tercer_digito'],
+  ])('identifica la causa de %s: %s', (c, causa) => expect(errorCedula(c)).toBe(causa));
+
+  it('no informa causa para una cédula válida', () => expect(errorCedula('1712345675')).toBeNull());
 });
 
 describe('Validación matemática del acta (RF-10, RF-19, S-03)', () => {
@@ -128,5 +141,45 @@ describe('Esquemas de usuario (RF-02, ADR-09)', () => {
     expect(nuevoUsuarioSchema.parse(base).nombres).toBe('Ana María');
     expect(nuevoUsuarioSchema.safeParse({ ...base, cedula: '1712345676' }).success).toBe(false);
     expect(nuevoUsuarioSchema.safeParse({ ...base, telefono: '2234567' }).success).toBe(false);
+  });
+  it.each([
+    ['1712345676', 'El dígito verificador no coincide.'],
+    ['171234567', 'La cédula debe tener exactamente 10 dígitos.'],
+    ['2512345678', 'El código de provincia no es válido.'],
+    ['1762345675', 'El tercer dígito de la cédula no es válido.'],
+  ])('muestra un mensaje específico para la cédula %s', (cedula, mensaje) => {
+    const base = { cedula, nombres: 'Ana', apellidos: 'Pérez', telefono: '0991234567', correo: 'ana@correo.com' };
+    const r = nuevoUsuarioSchema.safeParse(base);
+    expect(r.success).toBe(false);
+    const errores = r.success ? [] : r.error.issues.filter((i) => i.path[0] === 'cedula');
+    expect(errores.map((i) => i.message)).toEqual([mensaje]); // un solo mensaje, el de la causa
+  });
+});
+
+describe('Prueba de monitoreo (ADR-05, RF-17)', () => {
+  const monitoreoFalso = (id: string | null) => {
+    const llamadas: { error: unknown; tarea: string }[] = [];
+    const repo = {
+      iniciar: () => {},
+      registrarPantalla: () => {},
+      identificarUsuario: () => {},
+      reportarError: (error: unknown, tarea: string) => {
+        llamadas.push({ error, tarea });
+        return id;
+      },
+    };
+    return { repo, llamadas };
+  };
+
+  it('envía un error identificable con la etiqueta de prueba y devuelve el id del evento', () => {
+    const { repo, llamadas } = monitoreoFalso('evento-123');
+    expect(new ProbarMonitoreo(repo).execute()).toBe('evento-123');
+    expect(llamadas).toHaveLength(1);
+    expect((llamadas[0].error as Error).message).toBe('Error de prueba de monitoreo');
+    expect(llamadas[0].tarea).toBe(TAREA_PRUEBA_MONITOREO);
+  });
+
+  it('devuelve null si el monitoreo no está configurado', () => {
+    expect(new ProbarMonitoreo(monitoreoFalso(null).repo).execute()).toBeNull();
   });
 });

@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { StyleSheet, View } from 'react-native';
 
@@ -88,7 +88,8 @@ function FormularioActa(props: {
 }) {
   const { titulo, mesaId, dignidad, candidatos, existente } = props;
   const sincronizar = useSyncStore((s) => s.sincronizar);
-  const actaId = useRef(existente?.id ?? container.nuevoId()).current;
+  // Id estable del acta (idempotencia, ADR-03/10): el inicializador perezoso corre una sola vez.
+  const [actaId] = useState(() => existente?.id ?? container.nuevoId());
   const schema = useMemo(() => crearFormularioActaSchema(candidatos.map((c) => c.id)), [candidatos]);
 
   const { control, handleSubmit, formState } = useForm<FormularioActaEntrada, unknown, FormularioActaSalida>({

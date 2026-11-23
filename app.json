@@ -40,7 +40,6 @@
       "expo-web-browser",
       "expo-secure-store",
       "expo-sqlite",
-      "@sentry/react-native",
       [
         "expo-camera",
         {
@@ -52,6 +51,14 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "Control Electoral registra la ubicación al fotografiar el acta para comprobar que fue tomada en el recinto."
+        }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "react-native",
+          "organization": "oscar-s1"
         }
       ]
     ],

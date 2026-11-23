@@ -61,9 +61,9 @@ export class MonitoreoSentry implements MonitoreoRepository {
     Sentry.addBreadcrumb({ category: 'navegacion', message: ruta, level: 'info' });
   }
 
-  reportarError(error: unknown, tarea: string): void {
-    if (!this.activo) return;
-    Sentry.captureException(error, { tags: { tarea } });
+  reportarError(error: unknown, tarea: string): string | null {
+    if (!this.activo) return null;
+    return Sentry.captureException(error, { tags: { tarea } });
   }
 
   identificarUsuario(id: string | null): void {

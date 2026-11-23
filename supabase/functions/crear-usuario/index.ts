@@ -4,8 +4,8 @@
 //   Coordinador provincial → crea coordinadores de recinto (un recinto sin coordinador).
 //   Coordinador de recinto → crea veedores de SU recinto (incluso sustitutos externos).
 //
-// Flujo: valida quién llama → valida datos → invita por correo (enlace de verificación)
-// → asigna clave temporal + bandera debe_cambiar_clave en app_metadata → crea el perfil.
+// Flujo: valida quién llama → valida datos → crea la cuenta con clave temporal + bandera
+// debe_cambiar_clave en app_metadata → crea el perfil → invita por correo (enlace de verificación).
 // Si algo falla después de crear el usuario en Auth, se borra (no quedan cuentas a medias).
 // =============================================================================
 import {
@@ -96,25 +96,26 @@ Deno.serve((req) =>
       .eq('cedula', cedula);
     if ((cedulasIguales ?? 0) > 0) throw new ErrorControlado('cedula_duplicada', 409);
 
-    // ---- Alta en Auth: la invitación envía el ENLACE de verificación (RF-03) ----
-    const { data: invitado, error: errInvitacion } = await admin.auth.admin.inviteUserByEmail(correo, {
-      redirectTo: redireccionPermitida(b.redirectTo),
+    // ---- Alta en Auth ----
+    // ORDEN IMPORTANTE: primero la cuenta con su clave temporal y DESPUÉS la invitación.
+    // En Supabase Auth, asignar una clave (UpdatePassword) borra el token de confirmación:
+    // si la clave se asignara después de invitar, el enlace del correo quedaría inválido
+    // (otp_expired). createUser con email_confirm = false no envía correo.
+    const claveTemporal = generarClaveTemporal();
+    if (!CLAVE_REGEX.test(claveTemporal)) throw new Error('clave temporal inválida');
+    const { data: creado, error: errAlta } = await admin.auth.admin.createUser({
+      email: correo,
+      password: claveTemporal,
+      email_confirm: false, // RF-03: sin verificar el correo no puede iniciar sesión
+      app_metadata: { debe_cambiar_clave: true }, // ADR-01: solo el servidor escribe app_metadata
     });
-    if (errInvitacion || !invitado.user) {
-      const yaExiste = /already|registered|exists/i.test(errInvitacion?.message ?? '');
-      throw new ErrorControlado(yaExiste ? 'correo_duplicado' : 'error_invitacion', yaExiste ? 409 : 502);
+    if (errAlta || !creado.user) {
+      const yaExiste = /already|registered|exists/i.test(errAlta?.message ?? '');
+      throw new ErrorControlado(yaExiste ? 'correo_duplicado' : 'error_alta', yaExiste ? 409 : 502);
     }
-    const nuevoId = invitado.user.id;
+    const nuevoId = creado.user.id;
 
     try {
-      const claveTemporal = generarClaveTemporal();
-      if (!CLAVE_REGEX.test(claveTemporal)) throw new Error('clave temporal inválida');
-      const { error: errClave } = await admin.auth.admin.updateUserById(nuevoId, {
-        password: claveTemporal,
-        app_metadata: { debe_cambiar_clave: true },
-      });
-      if (errClave) throw errClave;
-
       const { error: errPerfil } = await admin.from('perfiles').insert({
         id: nuevoId,
         cedula,
@@ -126,6 +127,13 @@ Deno.serve((req) =>
         creado_por: llamante.id,
       });
       if (errPerfil) throw new ErrorControlado(errPerfil.code === '23505' ? 'dato_duplicado' : 'error_perfil', 409);
+
+      // Al final, la invitación: para un usuario existente sin confirmar, Supabase envía el
+      // ENLACE de verificación (RF-03, único y con expiración) sin tocar su clave ni su app_metadata.
+      const { error: errInvitacion } = await admin.auth.admin.inviteUserByEmail(correo, {
+        redirectTo: redireccionPermitida(b.redirectTo),
+      });
+      if (errInvitacion) throw new ErrorControlado('error_invitacion', 502);
 
       // La clave temporal se devuelve UNA vez a quien crea la cuenta. No se guarda ni se registra.
       return json({ id: nuevoId, rol: rolNuevo, claveTemporal }, 201);
