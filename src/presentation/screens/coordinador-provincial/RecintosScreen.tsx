@@ -12,7 +12,7 @@ import {
   StatusBadge,
 } from '@/presentation/components';
 import { mensajeDeError, useCoordinadores, useRecintos } from '@/presentation/hooks/consultas';
-import { spacing } from '@/presentation/theme';
+import { sizes, spacing } from '@/presentation/theme';
 
 /**
  * RF-06 / RF-07: recintos de la jurisdicción y su coordinador responsable (uno por recinto,
@@ -67,6 +67,7 @@ export default function RecintosScreen() {
                   variant="ghost"
                   size="md"
                   fullWidth={false}
+                  style={styles.botonHistorial}
                   onPress={() => router.push({ pathname: '/coordinador-provincial/mesas', params: { recintoId: r.id, nombre: r.nombre } })}
                 />
               </View>
@@ -82,4 +83,7 @@ const styles = StyleSheet.create({
   cuerpo: { gap: spacing.sm, alignItems: 'flex-start' },
   fila: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   flex: { flex: 1 },
+  // Altura estándar fija: sin ella, en Android el `flexGrow` del botón (ancho ajustado al texto)
+  // lo estiraba hasta el fondo de la pantalla y, como es transparente, ocultaba los demás recintos.
+  botonHistorial: { flexGrow: 0, height: sizes.buttonMd },
 });

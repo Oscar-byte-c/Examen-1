@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors, radius, spacing } from '@/presentation/theme';
+import { colors, radius, sizes, spacing } from '@/presentation/theme';
 
 import { AppButton } from './AppButton';
 import { AppText } from './AppText';
@@ -29,8 +29,14 @@ export function CamaraActa({ onCaptura, onCancelar }: Props) {
           icon="photo_camera"
           title="Necesitamos usar la cámara"
           description="La foto del acta es la evidencia del registro."
-          actionLabel="Permitir cámara"
-          onAction={() => void pedirPermiso()}
+        />
+        <AppButton
+          label="Permitir cámara"
+          variant="outline"
+          size="md"
+          fullWidth={false}
+          style={styles.botonPermiso}
+          onPress={() => void pedirPermiso()}
         />
         <AppButton label="Volver" variant="ghost" onPress={onCancelar} />
       </View>
@@ -67,6 +73,8 @@ export function CamaraActa({ onCaptura, onCancelar }: Props) {
 const styles = StyleSheet.create({
   root: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.text, zIndex: 10 },
   centro: { backgroundColor: colors.background, justifyContent: 'center', padding: spacing.lg },
+  // Altura estándar fija: sin ella el `flexGrow` del botón lo estiraba verticalmente.
+  botonPermiso: { alignSelf: 'center', flexGrow: 0, height: sizes.buttonMd, marginTop: spacing.sm },
   guia: { marginHorizontal: spacing.md, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.overlay },
   acciones: { position: 'absolute', left: spacing.md, right: spacing.md, bottom: 0, gap: spacing.sm },
 });
