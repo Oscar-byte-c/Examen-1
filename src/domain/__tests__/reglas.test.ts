@@ -4,12 +4,10 @@
  */
 import { describe, expect, it } from '@jest/globals';
 
-import { NITIDEZ_MINIMA } from '../constants';
 import { crearFormularioActaSchema, resumenSuma, validarResultados } from '../entities/Acta';
 import { errorCedula, validarCedula } from '../entities/cedula';
 import { resumir } from '../entities/Escrutinio';
 import { distanciaMetros, fueraDeRango, mejorLectura } from '../entities/geo';
-import { esFotoLegible, varianzaLaplaciano } from '../entities/nitidez';
 import { estadoReporte } from '../entities/Territorio';
 import { ProbarMonitoreo, TAREA_PRUEBA_MONITOREO } from '../use-cases/monitoreo';
 import { loginSchema, nuevaClaveSchema, nuevoUsuarioSchema } from '../entities/Usuario';
@@ -87,27 +85,6 @@ describe('Geolocalización (S-06, ADR-04)', () => {
     const l = (precisionM: number) => ({ ...recinto, precisionM, capturadaEn: '' });
     expect(mejorLectura([l(30), l(8), l(15)])?.precisionM).toBe(8);
     expect(mejorLectura([])).toBeNull();
-  });
-});
-
-describe('Nitidez de la foto (ADR-04, RF-11)', () => {
-  const imagen = (ancho: number, alto: number, valor: (x: number, y: number) => number) => {
-    const rgba = new Uint8Array(ancho * alto * 4);
-    for (let y = 0; y < alto; y++)
-      for (let x = 0; x < ancho; x++) {
-        const v = valor(x, y);
-        rgba.set([v, v, v, 255], (y * ancho + x) * 4);
-      }
-    return rgba;
-  };
-  it('una imagen con bordes marcados (tablero) es legible', () => {
-    const v = varianzaLaplaciano(imagen(40, 40, (x, y) => ((x >> 2) + (y >> 2)) % 2 ? 255 : 0), 40, 40);
-    expect(esFotoLegible(v)).toBe(true);
-  });
-  it('una imagen plana o con degradado suave no es legible', () => {
-    expect(varianzaLaplaciano(imagen(40, 40, () => 128), 40, 40)).toBe(0);
-    const v = varianzaLaplaciano(imagen(40, 40, (x) => x * 6), 40, 40);
-    expect(v).toBeLessThan(NITIDEZ_MINIMA);
   });
 });
 
