@@ -25,3 +25,50 @@ export function fueraDeRango(distanciaM: number): boolean {
 export function mejorLectura(lecturas: Ubicacion[]): Ubicacion | null {
   return lecturas.reduce<Ubicacion | null>((mejor, l) => (!mejor || l.precisionM < mejor.precisionM ? l : mejor), null);
 }
+
+/** Coordenadas utilizables: números finitos dentro de los rangos geográficos. */
+export function coordenadasValidas(c: Partial<Coordenadas> | null | undefined): c is Coordenadas {
+  return (
+    !!c &&
+    Number.isFinite(c.latitud) &&
+    Number.isFinite(c.longitud) &&
+    Math.abs(c.latitud as number) <= 90 &&
+    Math.abs(c.longitud as number) <= 180
+  );
+}
+
+/** Distancia y alerta ya calculadas por el SERVIDOR al recibir el acta (valores oficiales, S-06). */
+export type DistanciaServidor = { distanciaM: number; fueraDeRango: boolean };
+
+/**
+ * Cómo se presenta la ubicación de una evidencia (RF-12 / S-06):
+ *  - sin_ubicacion: no hay coordenadas válidas. NUNCA se sustituyen por otras (p. ej. la ubicación actual).
+ *  - sin_recinto: hay captura, pero no se conocen las coordenadas del recinto para comparar.
+ *  - evaluada: captura + recinto + distancia. `origen` dice quién la calculó: el servidor
+ *    (oficial, tras sincronizar) o el dispositivo (estimación previa al envío, misma fórmula).
+ */
+export type EvaluacionUbicacion =
+  | { estado: 'sin_ubicacion' }
+  | { estado: 'sin_recinto'; captura: Ubicacion }
+  | {
+      estado: 'evaluada';
+      captura: Ubicacion;
+      recinto: Coordenadas;
+      distanciaM: number;
+      fueraDeRango: boolean;
+      origen: 'servidor' | 'dispositivo';
+    };
+
+export function evaluarUbicacionEvidencia(
+  captura: Ubicacion | null | undefined,
+  recinto: Coordenadas | null | undefined,
+  servidor?: DistanciaServidor | null,
+): EvaluacionUbicacion {
+  if (!captura || !coordenadasValidas(captura)) return { estado: 'sin_ubicacion' };
+  if (!recinto || !coordenadasValidas(recinto)) return { estado: 'sin_recinto', captura };
+  if (servidor && Number.isFinite(servidor.distanciaM)) {
+    return { estado: 'evaluada', captura, recinto, ...servidor, origen: 'servidor' };
+  }
+  const distanciaM = distanciaMetros(captura, recinto);
+  return { estado: 'evaluada', captura, recinto, distanciaM, fueraDeRango: fueraDeRango(distanciaM), origen: 'dispositivo' };
+}

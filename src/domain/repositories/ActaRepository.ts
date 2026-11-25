@@ -19,4 +19,9 @@ export interface ActaRepository {
   observarCambios(callback: () => void): () => void;
   /** Copia la foto temporal de la cámara a almacenamiento persistente y devuelve su nueva ruta. */
   conservarFoto(uriTemporal: string, actaId: string): Promise<string>;
+  /**
+   * Dirección TEMPORAL para ver una foto guardada en el servidor (bucket privado). Solo se
+   * concede si quien la pide puede ver esa mesa (RLS de Storage) y caduca en pocos minutos.
+   */
+  urlFotoServidor(fotoPath: string): Promise<string>;
 }

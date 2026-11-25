@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import type { Ubicacion } from './geo';
+import type { DistanciaServidor, Ubicacion } from './geo';
 
 export const Dignidad = { ALCALDIA: 'alcaldia', PREFECTURA: 'prefectura' } as const;
 export type Dignidad = (typeof Dignidad)[keyof typeof Dignidad];
@@ -49,9 +49,12 @@ export type Acta = ResultadosActa & {
   id: string;
   mesaId: string;
   dignidad: Dignidad;
-  /** Ruta del archivo de la foto en el almacenamiento persistente de la app. */
+  /** Ruta del archivo de la foto en el almacenamiento persistente de la app ('' si solo está en el servidor). */
   fotoUri: string;
+  /** Ubicación GPS tomada al capturar la foto (RF-12): es la ubicación ORIGINAL de la evidencia. */
   ubicacion: Ubicacion;
+  /** Solo en actas leídas del servidor: ruta de la foto en Storage y la distancia oficial (S-06). */
+  evidenciaServidor?: EvidenciaServidor | null;
   /** Versión del servidor sobre la que se hizo el cambio (0 = acta nueva). S-04. */
   versionBase: number;
   estado: EstadoEnvio;
@@ -162,6 +165,9 @@ export function aResultados(d: {
     votos: Object.entries(d.votos).map(([candidatoId, votos]) => ({ candidatoId, votos })),
   };
 }
+
+/** Evidencia tal como quedó registrada en el servidor (bucket privado; se lee con permiso RLS). */
+export type EvidenciaServidor = DistanciaServidor & { fotoPath: string };
 
 /** Evidencia lista para adjuntar: foto ya analizada y ubicación tomada al disparar. */
 export type EvidenciaActa = { fotoUri: string; nitidez: number; ubicacion: Ubicacion };

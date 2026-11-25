@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
-import type { Dignidad } from '@/domain/entities/Acta';
+import type { Acta, Dignidad } from '@/domain/entities/Acta';
+import { Role } from '@/domain/entities/Role';
 import { ErrorDominio } from '@/domain/entities/errores';
 import type { NuevoRecintoDatos } from '@/domain/entities/Territorio';
 import type { DatosCuenta } from '@/domain/use-cases/usuarios';
@@ -23,6 +24,7 @@ export const claves = {
   conteo: ['conteo'] as const,
   ubicaciones: ['ubicaciones'] as const,
   conflictos: ['conflictos'] as const,
+  fotoEvidencia: (actaId: string, origen: string) => ['foto-evidencia', actaId, origen] as const,
 };
 
 /** Mensaje para el usuario: los errores de dominio ya vienen redactados; el resto es genérico. */
@@ -38,6 +40,41 @@ export const useCandidatos = (d: Dignidad) =>
 
 export const useActa = (mesaId: string, d: Dignidad) =>
   useQuery({ queryKey: claves.acta(mesaId, d), queryFn: () => container.obtenerActa.execute(mesaId, d), gcTime: 0 });
+
+/**
+ * RF-12: foto original de un acta registrada (copia local o dirección temporal del servidor).
+ * La dirección firmada dura 5 min: se considera vigente 4 min y no se guarda tras salir.
+ */
+export const useFotoEvidencia = (acta: Acta | null) =>
+  useQuery({
+    queryKey: claves.fotoEvidencia(acta?.id ?? '', acta?.fotoUri || acta?.evidenciaServidor?.fotoPath || ''),
+    queryFn: () => container.obtenerFotoEvidencia.execute(acta!),
+    enabled: !!acta,
+    staleTime: 4 * 60_000,
+    gcTime: 0,
+    retry: 1,
+  });
+
+/**
+ * Coordenadas del recinto de una mesa, para comparar con la ubicación de la foto (S-06).
+ * Reutiliza consultas existentes: el veedor las tiene en la caché de sus mesas (funciona sin red);
+ * el coordinador de recinto, en su recinto (la RLS solo le entrega el suyo).
+ */
+export function useRecintoDeMesa(mesaId: string, rol: Role | null, recintoId: string | null) {
+  const esVeedor = rol === Role.VEEDOR;
+  const misMesas = useQuery({
+    queryKey: claves.misMesas,
+    queryFn: () => container.listarMisMesas.execute(),
+    enabled: esVeedor,
+  });
+  const recintos = useQuery({
+    queryKey: claves.recintos,
+    queryFn: () => container.listarRecintos.execute(),
+    enabled: rol === Role.COORDINADOR_RECINTO && !!recintoId,
+  });
+  if (esVeedor) return misMesas.data?.find((m) => m.id === mesaId)?.recinto ?? null;
+  return recintos.data?.find((r) => r.id === recintoId) ?? null;
+}
 
 // ---- Territorio y equipo ----
 export const useRecintos = () => useQuery({ queryKey: claves.recintos, queryFn: () => container.listarRecintos.execute() });
