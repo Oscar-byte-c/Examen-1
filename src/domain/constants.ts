@@ -20,8 +20,20 @@ export const ORGANIZACIONES_POR_DIGNIDAD = 5;
 export const LECTURAS_GPS = 3;
 
 /**
- * ADR-04: varianza mínima del laplaciano (sobre la foto reducida a `ANCHO_ANALISIS_FOTO` px)
- * para considerar legible la foto. Debe calibrarse con fotos reales de actas.
+ * Tiempo TOTAL máximo para reunir esas lecturas tras la captura. Sin internet el GPS no tiene
+ * asistencia (A-GPS, Wi-Fi) y el primer fix tarda más; por eso además se precalienta el GPS al
+ * abrir la pantalla del acta. Si vence sin ninguna lectura, se repite la foto (S-06).
  */
-export const NITIDEZ_MINIMA = 60;
-export const ANCHO_ANALISIS_FOTO = 480;
+export const TIEMPO_MAX_GPS_MS = 60_000;
+
+/**
+ * ADR-04: nitidez mínima (`nitidezImagen`, sobre la foto reducida a `ANCHO_ANALISIS_FOTO` px)
+ * para considerar legible la foto. Calibrado por simulación (ADR-C02 §5): una foto nítida da
+ * ≥ ~400 aun con poca luz, y una con desenfoque que impide leer los números (σ ≥ 6 px a 3000 px)
+ * da ≤ ~130. Debe confirmarse con fotos reales de actas.
+ * El valor anterior (60, sobre 480 px y sin promediar) nunca se alcanzaba: el ruido del sensor
+ * mantenía la varianza por encima de 150 incluso en fotos muy borrosas.
+ */
+export const NITIDEZ_MINIMA = 200;
+/** 1000 px: a 480 px el desenfoque que impide leer los números casi desaparecía al reducir. */
+export const ANCHO_ANALISIS_FOTO = 1000;

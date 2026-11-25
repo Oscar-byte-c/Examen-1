@@ -6,10 +6,11 @@ import {
   PerfilNoEncontradoError,
   SinConexionError,
 } from '@/domain/entities/errores';
-import type { SesionRestaurada, Usuario } from '@/domain/entities/Usuario';
+import type { ResultadoCambioClave, SesionRestaurada, Usuario } from '@/domain/entities/Usuario';
 import type { AuthRepository } from '@/domain/repositories/AuthRepository';
 
 import { perfilCache } from '../datasources/local/perfilCache';
+import { perfilDeSesionGuardada } from '../datasources/local/sesionLocal';
 import { secureStoreAdapter } from '../datasources/local/secureStoreAdapter';
 import { CLAVE_SESION, supabase } from '../datasources/remote/supabaseClient';
 import { esErrorDeRed, traducirErrorAuth, traducirErrorFuncion } from '../mappers/errores';
@@ -70,28 +71,48 @@ export class AuthRepositoryImpl implements AuthRepository {
       return null;
     }
 
-    // D3: sin red. Si hay sesión guardada Y perfil en caché, se entra en modo "sin verificar".
-    // Al volver la red supabase-js refresca el token; si el servidor lo rechaza, se cierra la sesión.
-    const [guardada, cache] = await Promise.all([secureStoreAdapter.getItem(CLAVE_SESION), perfilCache.leer()]);
-    if (guardada && cache) return { usuario: cache, verificada: false };
-    return null;
+    // D3: sin red. Si hay sesión guardada Y el perfil en caché es DE ESA MISMA cuenta, se entra en
+    // modo "sin verificar". Al volver la red supabase-js refresca el token; si el servidor lo
+    // rechaza, se cierra la sesión.
+    const cache = await perfilDeSesionGuardada(CLAVE_SESION);
+    return cache ? { usuario: cache, verificada: false } : null;
   }
 
   observarCierre(callback: () => void): () => void {
     const { data } = supabase.auth.onAuthStateChange((evento) => {
       // No se llama a ningún método de supabase.auth dentro de este callback (puede bloquearse).
-      if (evento === 'SIGNED_OUT') callback();
+      if (evento === 'SIGNED_OUT') {
+        // Sesión terminada (cierre, revocación o token rechazado): el perfil de esa cuenta no
+        // debe quedar en el dispositivo para una sesión posterior.
+        void perfilCache.borrar().catch(() => undefined);
+        callback();
+      }
     });
     return () => data.subscription.unsubscribe();
   }
 
-  async cambiarClave(clave: string): Promise<Usuario> {
+  async cambiarClave(clave: string): Promise<ResultadoCambioClave> {
+    // El correo se toma ANTES del cambio: después, la sesión actual deja de ser válida.
+    const { data: actual } = await supabase.auth.getSession();
+    const correo = actual.session?.user.email;
+
     const { error } = await supabase.functions.invoke('cambiar-clave', { body: { clave } });
+    // Solo aquí hay un error real: la clave NO cambió (clave débil, repetida, sin red, etc.).
     if (error) throw await traducirErrorFuncion(error);
-    // El JWT debe renovarse para que incluya app_metadata.debe_cambiar_clave = false (lo usa la RLS).
-    const { data, error: errRefresh } = await supabase.auth.refreshSession();
-    if (errRefresh || !data.user) throw traducirErrorAuth(errRefresh);
-    return this.cargarUsuario(data.user);
+
+    // Desde aquí la clave YA cambió en el servidor. Supabase Auth, al cambiar la clave con la
+    // API de administración, cierra TODAS las sesiones del usuario (revoca sus refresh tokens);
+    // por eso `refreshSession()` fallaba y se mostraba un error falso. Se ingresa de nuevo con
+    // la clave nueva: el JWT nuevo ya trae app_metadata.debe_cambiar_clave = false (lo usa la RLS).
+    if (correo) {
+      try {
+        return { tipo: 'sesion_iniciada', usuario: await this.iniciarSesion(correo, clave) };
+      } catch {
+        // Sin red u otro fallo del reingreso: NO es un error del cambio de clave.
+      }
+    }
+    await this.cerrarLocal(); // la sesión anterior ya no sirve: se borra del dispositivo
+    return { tipo: 'reingreso_requerido' };
   }
 
   async solicitarRecuperacion(correo: string, urlRetorno: string): Promise<void> {

@@ -17,7 +17,9 @@ import {
   ListarActasLocales,
   ObservarActas,
   ObtenerActa,
+  ObtenerFotoEvidencia,
   ObtenerUbicacionActual,
+  PrepararUbicacion,
   SincronizarActas,
 } from '@/domain/use-cases/actas';
 import {
@@ -93,11 +95,13 @@ export const container = {
   analizarEvidencia: new AnalizarEvidencia(evidencia, actas),
   guardarActa: new GuardarActa(actas),
   obtenerActa: new ObtenerActa(actas),
+  obtenerFotoEvidencia: new ObtenerFotoEvidencia(actas),
   listarActasLocales: new ListarActasLocales(actas),
   sincronizarActas: new SincronizarActas(actas),
   observarActas: new ObservarActas(actas),
   observarConectividad: new ObservarConectividad(conectividad),
   obtenerUbicacionActual: new ObtenerUbicacionActual(evidencia),
+  prepararUbicacion: new PrepararUbicacion(evidencia),
 
   // Seguimiento (RF-15, ADR-07, S-04)
   obtenerAvance: new ObtenerAvance(escrutinio),

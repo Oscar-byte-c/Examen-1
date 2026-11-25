@@ -7,11 +7,14 @@ import type { MonitoreoRepository } from '@/domain/repositories/MonitoreoReposit
 
 import { ActaLocalDataSource } from '../datasources/local/ActaLocalDataSource';
 import { conectividad, fotosLocales } from '../datasources/local/dispositivo';
-import { supabase } from '../datasources/remote/supabaseClient';
+import { perfilDeSesionGuardada } from '../datasources/local/sesionLocal';
+import { CLAVE_SESION, supabase } from '../datasources/remote/supabaseClient';
 import { aPayloadSincronizacion, deActaRemota, type ActaRemotaDTO } from '../mappers/actaMapper';
 import { esErrorDeRed, traducirErrorDatos } from '../mappers/errores';
 
 const BUCKET = 'actas-fotos';
+/** Vida de la dirección temporal de una foto: suficiente para verla, corta si se filtra. */
+const SEGUNDOS_URL_FOTO = 300;
 
 /**
  * Actas: primero local (SQLite) y luego la outbox hacia Supabase (ADR-03, ADR-10).
@@ -35,9 +38,15 @@ export class ActaRepositoryImpl implements ActaRepository {
     this.oyentes.forEach((cb) => cb());
   }
 
+  /**
+   * Autor de las actas locales. Con red, la sesión de supabase-js. Sin red y con el token
+   * vencido, `getSession()` devuelve null aunque la sesión siga en el dispositivo: se usa la
+   * sesión guardada, solo si coincide con el perfil validado en caché (ver sesionLocal.ts).
+   */
   private async usuarioId(): Promise<string | null> {
     const { data } = await supabase.auth.getSession();
-    return data.session?.user.id ?? null;
+    if (data.session) return data.session.user.id;
+    return (await perfilDeSesionGuardada(CLAVE_SESION))?.id ?? null;
   }
 
   async guardarLocal(acta: Omit<Acta, 'estado' | 'error' | 'actualizadaEn'>): Promise<void> {
@@ -57,7 +66,7 @@ export class ActaRepositoryImpl implements ActaRepository {
     // El coordinador de recinto puede corregir actas registradas por un veedor (RF-13).
     const { data, error } = await supabase
       .from('actas')
-      .select('id, mesa_id, dignidad, total_sufragantes, votos_blancos, votos_nulos, latitud, longitud, precision_gps_m, capturada_en, version, updated_at, votos_acta(candidato_id, votos)')
+      .select('id, mesa_id, dignidad, total_sufragantes, votos_blancos, votos_nulos, latitud, longitud, precision_gps_m, capturada_en, foto_path, distancia_recinto_m, fuera_de_rango, version, updated_at, votos_acta(candidato_id, votos)')
       .eq('mesa_id', mesaId)
       .eq('dignidad', dignidad)
       .maybeSingle<ActaRemotaDTO>();
@@ -77,6 +86,13 @@ export class ActaRepositoryImpl implements ActaRepository {
 
   async conservarFoto(uriTemporal: string, actaId: string): Promise<string> {
     return fotosLocales.conservar(uriTemporal, actaId);
+  }
+
+  /** El bucket es privado: Storage verifica la política `fotos_actas_lectura` antes de firmar. */
+  async urlFotoServidor(fotoPath: string): Promise<string> {
+    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(fotoPath, SEGUNDOS_URL_FOTO);
+    if (error || !data?.signedUrl) throw traducirErrorDatos(error);
+    return data.signedUrl;
   }
 
   sincronizar(): Promise<ResultadoSincronizacion> {

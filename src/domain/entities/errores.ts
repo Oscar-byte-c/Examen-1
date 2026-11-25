@@ -38,7 +38,31 @@ export class FotoIlegibleError extends ErrorDominio {
   constructor() { super('La foto está borrosa y no se leen bien los números. Tómala de nuevo con más luz y sin mover el celular.'); }
 }
 export class UbicacionRequeridaError extends ErrorDominio {
-  constructor() { super('Necesitamos tu ubicación para guardar el acta. Activa el GPS y da permiso de ubicación.'); }
+  constructor(message = 'Necesitamos tu ubicación para guardar el acta. Activa el GPS y da permiso de ubicación.') { super(message); }
+}
+// Causas concretas de UbicacionRequeridaError (heredan de ella: el GPS sigue siendo obligatorio, S-06).
+export class PermisoUbicacionError extends UbicacionRequeridaError {
+  constructor() { super('La app no tiene permiso de ubicación. Concédelo en los ajustes del celular: es obligatorio para registrar el acta.'); }
+}
+export class GpsDesactivadoError extends UbicacionRequeridaError {
+  constructor() { super('La ubicación (GPS) del celular está apagada. Actívala y vuelve a tomar la foto.'); }
+}
+export class UbicacionAproximadaError extends UbicacionRequeridaError {
+  constructor() {
+    super(
+      'La app solo tiene permiso de ubicación APROXIMADA y con él el celular no usa el GPS. ' +
+        'Actívala así: Ajustes › Aplicaciones › esta app › Permisos › Ubicación › «Usar ubicación precisa». Luego vuelve a tomar la foto.',
+    );
+  }
+}
+export class SinSenalGpsError extends UbicacionRequeridaError {
+  /** `detalle`: diagnóstico técnico SIN coordenadas (lecturas recibidas, descartadas, proveedor GPS). */
+  constructor(segundos = 60, detalle?: string) {
+    super(
+      `No se obtuvo señal GPS en ${segundos} segundos. Sin internet el GPS tarda más: acércate a una ventana o sal al exterior y vuelve a tomar la foto.` +
+        (detalle ? `\n\nDetalle técnico: ${detalle}` : ''),
+    );
+  }
 }
 export class ErrorDesconocido extends ErrorDominio {
   constructor() { super('Ocurrió un problema inesperado. Inténtalo de nuevo.'); }
