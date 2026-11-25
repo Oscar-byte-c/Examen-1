@@ -23,7 +23,8 @@ import { colors, radius, spacing } from '@/presentation/theme';
 
 /**
  * Tablero del coordinador provincial (RF-15, S-02, ADR-07): mesas reportadas, parciales y
- * faltantes, conteo acumulado por candidato y dignidad, avance por recinto.
+ * faltantes, conteo acumulado por candidato y dignidad, avance por recinto y acceso a los
+ * resultados por recinto (RF-15).
  * Se actualiza en vivo con Supabase Realtime, sin recargar la pantalla.
  */
 export default function CoordinadorProvincialHomeScreen() {
@@ -45,6 +46,12 @@ export default function CoordinadorProvincialHomeScreen() {
           action={{ icon: 'logout', label: 'Salir', onPress: () => void cerrarSesion() }}
         />
       }>
+      <AppButton
+        label="Resultados por recinto"
+        icon="leaderboard"
+        accessibilityHint="Votos de cada candidato en cada recinto y en total"
+        onPress={() => router.push('/coordinador-provincial/resultados')}
+      />
       <View style={styles.botones}>
         <AppButton label="Mapa de actas" icon="map" variant="outline" onPress={() => router.push('/coordinador-provincial/mapa')} style={styles.boton} />
         <AppButton label="Recintos" icon="apartment" variant="outline" onPress={() => router.push('/coordinador-provincial/recintos')} style={styles.boton} />

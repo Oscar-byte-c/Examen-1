@@ -283,7 +283,8 @@ claude
 ## Documentación
 
 - [docs/CONTEXTO_PROYECTO.md](docs/CONTEXTO_PROYECTO.md): estado, decisiones, pendientes y cómo configurar una computadora nueva.
-- [docs/ADR_LINEA_BASE.md](docs/ADR_LINEA_BASE.md) y [docs/adr/](docs/adr/): decisiones de arquitectura.
+- [docs/ADR_GRUPAL.md](docs/ADR_GRUPAL.md): las 11 decisiones del trabajo grupal, consolidadas y explicadas.
+- [docs/ADR_LINEA_BASE.md](docs/ADR_LINEA_BASE.md) y [docs/adr/](docs/adr/): línea base, una ficha por ADR (`ADR-01` a `ADR-11`) y los ADR complementarios de implementación (`ADR-C01`, `ADR-C02`).
 - [docs/ESTRUCTURA_PROYECTO.md](docs/ESTRUCTURA_PROYECTO.md): estructura de carpetas, navegación y configuración.
 - [docs/SISTEMA_DISENO.md](docs/SISTEMA_DISENO.md): colores, tipografía, espaciado y componentes base.
 - [docs/plan/FASE3_AUTENTICACION.md](docs/plan/FASE3_AUTENTICACION.md): plan aprobado de la Fase 3.

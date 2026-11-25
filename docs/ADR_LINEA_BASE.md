@@ -48,6 +48,8 @@
 
 ## 2. Decisiones técnicas (ADR del documento grupal)
 
+> Documento consolidado y explicado: [`ADR_GRUPAL.md`](ADR_GRUPAL.md). Ficha completa de cada ADR (alternativas, consecuencias y evidencia en el código): `docs/adr/ADR-01-…` a `docs/adr/ADR-11-…`.
+
 | ADR | Decisión |
 |---|---|
 | ADR-01 | **Supabase Auth.** Cuentas creadas por API (sin registro público). La **clave temporal se controla con una bandera en los metadatos** que la app verifica en el primer ingreso. Aislamiento por rol y recinto con RLS |
@@ -92,4 +94,5 @@ Los ADR complementarios (decisiones de implementación posteriores, que no cambi
 | 4.6 | Variables de entorno | Un único `.env` en la raíz; lectura en `src/data/datasources/remote/` | ✅ Decisión del equipo |
 | 4.7 | Versión de Expo | **SDK 57 obligatorio.** Costo conocido: 3 vulnerabilidades *high* (DoS en `decode-uri-component`), corregidas solo en SDK 58; impacto bajo | ✅ Requisito |
 | 4.8 | Alineación con el documento grupal | Cambios respecto de la línea base anterior: umbral GPS **500 → 300 m** y GPS obligatorio (S-06); recuperación por **enlace** en vez de OTP (ADR-02); bandera de clave temporal en `app_metadata` en vez de una columna (ADR-01); se agregan React Hook Form y Zod (ADR-08/09); el provincial no edita actas (ADR-11) | ✅ [ADR-C02](adr/ADR-C02-implementacion-adr-grupal.md) |
+| 4.10 | Identidad visual (RNF-06, sin ADR grupal) | El documento grupal no fija colores ni organización. Decisión del estudiante (25/11): paleta con **referencia en los colores institucionales del CNE** (tomados del tema y del logo del sitio oficial cne.gob.ec), sin logotipo ni afirmación de producto oficial. No cambia ninguna tecnología acordada | ✅ [ADR-C02 §10](adr/ADR-C02-implementacion-adr-grupal.md) |
 | 4.9 | Dependencias auxiliares | `@hookform/resolvers` (une ADR-08 y ADR-09), `expo-crypto` (UUID, ADR-10) y `jpeg-js` (medición de nitidez, ADR-04). No reemplazan ninguna tecnología acordada | ✅ [ADR-C02](adr/ADR-C02-implementacion-adr-grupal.md) |

@@ -110,7 +110,7 @@ En la fase de autenticación se reemplazará por un store de Zustand alimentado 
 | `.env` (raíz) | `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `EXPO_PUBLIC_SENTRY_DSN` | Archivo único de variables. Expo inserta las `EXPO_PUBLIC_*` en el bundle al compilar. Tras modificarlo hay que reiniciar Metro (`npx expo start --clear`). |
 | `src/data/datasources/remote/supabaseConfig.ts` | `getSupabaseConfig()` lee y valida URL y publishable key | La conexión a Supabase es responsabilidad de `data`. Usa acceso literal `process.env.EXPO_PUBLIC_*`. La `service_role` nunca va en la app, solo en Edge Functions. |
 | `src/domain/constants.ts` | `GEO_ALERT_THRESHOLD_METERS = 300`, dignidades y número de organizaciones | Acuerdos del consenso: alerta a más de 300 m sin bloquear el registro (S-06 del documento grupal). Son reglas de negocio, por eso viven en `domain`. |
-| `src/presentation/theme/colors.ts` | Paleta provisional y tipografía ampliada | Colores de la organización (pendientes de definir) y RNF-03 (usabilidad para adultos mayores). |
+| `src/presentation/theme/colors.ts` | Paleta con referencia en los colores institucionales del CNE (sin logotipo) y tipografía ampliada | RNF-06 (colores de la organización, ver `SISTEMA_DISENO.md` §1.1) y RNF-07 (usabilidad para adultos mayores). |
 
 ### Contenido de la plantilla eliminado
 

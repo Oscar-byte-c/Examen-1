@@ -55,10 +55,14 @@ export const shadows = {
   // Una sola elevación mínima: la separación principal la da el borde fino (estilo documento).
   card: {
     elevation: 1,
-    shadowColor: '#111B3D',
+    shadowColor: '#0F2E45', // azul marino profundo (paleta CNE)
     shadowOpacity: 0.05,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 1 },
+  },
+  /** Hoja elevada del asistente del acta: dos capas suaves (RN 0.86 `boxShadow`, sin dependencias). */
+  hoja: {
+    boxShadow: '0px 1px 2px rgba(21, 62, 92, 0.06), 0px 8px 24px rgba(21, 62, 92, 0.08)',
   },
   raised: {
     elevation: 4,

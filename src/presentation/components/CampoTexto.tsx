@@ -21,6 +21,7 @@ export function CampoTexto<T extends FieldValues>({ control, name, ...props }: P
       render={({ field, fieldState }) => (
         <AppInput
           {...props}
+          ref={field.ref}
           value={field.value ?? ''}
           onChangeText={field.onChange}
           onBlur={field.onBlur}

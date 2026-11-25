@@ -6,7 +6,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { CredencialesInvalidasError } from '@/domain/entities/errores';
 import { loginSchema } from '@/domain/entities/Usuario';
-import { AppButton, AppIcon, AppText, CampoTexto, Retroalimentacion } from '@/presentation/components';
+import { AppButton, AppIcon, AppText, CampoTexto, Retroalimentacion, ValidandoAcceso } from '@/presentation/components';
 import { PantallaAuth } from '@/presentation/components/PantallaAuth';
 import { mensajeDeError } from '@/presentation/hooks/consultas';
 import { useAuthStore } from '@/presentation/store/authStore';
@@ -82,7 +82,7 @@ export default function LoginScreen() {
       />
 
       {avisoLogin && !error ? <Retroalimentacion tipo="exito" titulo="Clave actualizada" mensaje={avisoLogin} /> : null}
-      {formState.isSubmitting ? <Retroalimentacion tipo="proceso" titulo="Verificando tus datos…" /> : null}
+      <ValidandoAcceso visible={formState.isSubmitting} />
       {error ? <Retroalimentacion tipo="error" titulo="No pudimos ingresar" mensaje={error} /> : null}
 
       <AppButton

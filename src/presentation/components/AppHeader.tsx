@@ -116,5 +116,5 @@ const styles = StyleSheet.create({
   },
   actionPressed: { backgroundColor: colors.onPrimaryVeilPressed },
   /** Franja ocre del «sello»: decorativa, no transmite información. */
-  franja: { height: sizes.franja, backgroundColor: colors.accent },
+  franja: { height: sizes.franja, backgroundColor: colors.oro }, // amarillo CNE: solo decorativo
 });

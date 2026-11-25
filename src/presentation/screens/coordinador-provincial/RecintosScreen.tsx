@@ -16,7 +16,8 @@ import { spacing } from '@/presentation/theme';
 
 /**
  * RF-06 / RF-07: recintos de la jurisdicción y su coordinador responsable (uno por recinto,
- * garantizado por un índice único en la base de datos).
+ * garantizado por un índice único en la base de datos). Desde cada recinto se abren sus mesas
+ * y el historial de sus actas (S-04 / ADR-11).
  */
 export default function RecintosScreen() {
   const recintos = useRecintos();
@@ -59,6 +60,15 @@ export default function RecintosScreen() {
                     />
                   </>
                 )}
+                {/* S-04 / ADR-11: auditoría de las actas del recinto (solo lectura). */}
+                <AppButton
+                  label="Mesas e historial"
+                  icon="history"
+                  variant="ghost"
+                  size="md"
+                  fullWidth={false}
+                  onPress={() => router.push({ pathname: '/coordinador-provincial/mesas', params: { recintoId: r.id, nombre: r.nombre } })}
+                />
               </View>
             </AppCard>
           );

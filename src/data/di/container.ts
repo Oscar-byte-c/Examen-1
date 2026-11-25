@@ -32,10 +32,12 @@ import {
   SolicitarRecuperacion,
 } from '@/domain/use-cases/auth';
 import {
+  ConsultarHistorialActa,
   ListarConflictos,
   ObservarConectividad,
   ObtenerAvance,
   ObtenerConteo,
+  ObtenerResultadosPorRecinto,
   ObtenerUbicacionesActas,
   ResolverConflicto,
   SuscribirseEscrutinio,
@@ -106,6 +108,8 @@ export const container = {
   // Seguimiento (RF-15, ADR-07, S-04)
   obtenerAvance: new ObtenerAvance(escrutinio),
   obtenerConteo: new ObtenerConteo(escrutinio),
+  obtenerResultadosPorRecinto: new ObtenerResultadosPorRecinto(escrutinio),
+  consultarHistorialActa: new ConsultarHistorialActa(escrutinio),
   obtenerUbicacionesActas: new ObtenerUbicacionesActas(escrutinio),
   listarConflictos: new ListarConflictos(escrutinio),
   resolverConflicto: new ResolverConflicto(escrutinio),

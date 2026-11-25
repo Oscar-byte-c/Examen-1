@@ -6,7 +6,9 @@ const path = require('path');
 const FR = 30;
 const f = (s) => Math.round(s * FR);
 const col = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
-const TINTA = col('#1B2A57'), OCRE = col('#8C5A0B'), LINEA = col('#D3D9E2'), BLANCO = col('#FFFFFF'), VERDE = col('#15803D');
+// Paleta CNE (RNF-06, ver src/presentation/theme/colors.ts): azul marino #153E5C (antes tinta) y azul #0061AB
+// como acento (antes ocre; el amarillo #FDD206 no se lee sobre las tarjetas claras donde se muestran).
+const TINTA = col('#153E5C'), OCRE = col('#0061AB'), LINEA = col('#D3D9E2'), BLANCO = col('#FFFFFF'), VERDE = col('#15803D');
 
 // ---- propiedades -----------------------------------------------------------
 const E = {

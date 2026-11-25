@@ -128,6 +128,38 @@ for (const [nombre, u] of Object.entries({ provincial, recinto, veedor })) {
   check(Boolean(conf.error) || conf.data.length === 0, '[veedor] no ve conflictos (solo coordinadores)');
 }
 
+// ---- 5. Historial y resultados por recinto (S-04, ADR-11, RF-15). Solo lectura. ----------
+{
+  const hv = await veedor.sb.from('actas_historial').select('id');
+  check(Boolean(hv.error) || hv.data.length === 0, '[veedor] no ve el historial de actas (solo coordinadores)');
+
+  const { data: recRecinto } = await recinto.sb.from('recintos').select('id');
+  const hr = await recinto.sb.from('actas_historial').select('id, acta:actas!inner(mesa:mesas!inner(recinto_id))');
+  check(
+    !hr.error && hr.data.every((h) => h.acta.mesa.recinto_id === recRecinto?.[0]?.id),
+    '[recinto] solo ve el historial de las actas de su recinto',
+    hr.error?.code ?? `${hr.data.length} versión(es)`,
+  );
+
+  const rp = await provincial.sb.from('actas').select('id, mesa:mesas!inner(recinto_id), votos:votos_acta(candidato_id, votos)');
+  const cp = await provincial.sb.rpc('conteo_por_candidato');
+  const sumaActas = (rp.data ?? []).reduce((s, a) => s + a.votos.reduce((t, v) => t + v.votos, 0), 0);
+  const sumaConteo = (cp.data ?? []).reduce((s, c) => s + Number(c.votos), 0);
+  check(!rp.error && !cp.error && sumaActas === sumaConteo, '[provincial] votos por recinto = total general del servidor', `${sumaActas} / ${sumaConteo}`);
+
+  // RF-15 / RF-18: la misma consulta de «Resultados por recinto» no entrega datos ajenos.
+  const vr = await recinto.sb.from('actas').select('id, mesa:mesas!inner(recinto_id), votos:votos_acta(candidato_id, votos)');
+  check(
+    !vr.error && vr.data.every((a) => a.mesa.recinto_id === recRecinto?.[0]?.id),
+    '[recinto] los votos por recinto solo incluyen su recinto',
+    vr.error?.code ?? `${vr.data.length} acta(s)`,
+  );
+  const { data: mesasVeedor } = await veedor.sb.from('mesas').select('id');
+  const idsVeedor = new Set((mesasVeedor ?? []).map((m) => m.id));
+  const vv = await veedor.sb.from('actas').select('id, mesa_id, votos:votos_acta(candidato_id, votos)');
+  check(!vv.error && vv.data.every((a) => idsVeedor.has(a.mesa_id)), '[veedor] solo ve votos de sus mesas asignadas', vv.error?.code ?? `${vv.data.length} acta(s)`);
+}
+
 for (const u of [provincial, recinto, veedor]) await u.sb.auth.signOut();
 console.log(fallos === 0 ? '\nResultado: TODAS las verificaciones pasaron.' : `\nResultado: ${fallos} verificación(es) FALLARON.`);
 process.exit(fallos === 0 ? 0 : 1);

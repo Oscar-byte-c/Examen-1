@@ -22,6 +22,7 @@ import { spacing } from '@/presentation/theme';
  *  - RF-08 / RF-20 / S-05: asignar o reasignar AL INSTANTE la mesa a otro veedor
  *    (el servidor revoca la asignación anterior) o crear un veedor sustituto.
  *  - RF-13: corregir las actas de la mesa.
+ *  - S-04 / ADR-11: consultar el historial de versiones de cada acta registrada.
  */
 export default function MesaRecintoScreen() {
   const { mesaId, mesaNumero } = useLocalSearchParams<{ mesaId: string; mesaNumero: string }>();
@@ -38,13 +39,25 @@ export default function MesaRecintoScreen() {
       <AppCard title="Actas de la mesa" icon="description">
         <View style={styles.lista}>
           {DIGNIDADES_LISTA.map((d) => (
-            <AppButton
-              key={d}
-              label={`${mesa?.dignidadesRecibidas.includes(d) ? 'Corregir' : 'Registrar'} acta de ${DIGNIDAD_LABELS[d]}`}
-              icon="edit_note"
-              variant="outline"
-              onPress={() => router.push({ pathname: '/coordinador-recinto/acta', params: { mesaId, dignidad: d, mesaNumero } })}
-            />
+            <View key={d} style={styles.acta}>
+              <AppButton
+                label={`${mesa?.dignidadesRecibidas.includes(d) ? 'Corregir' : 'Registrar'} acta de ${DIGNIDAD_LABELS[d]}`}
+                icon="edit_note"
+                variant="outline"
+                onPress={() => router.push({ pathname: '/coordinador-recinto/acta', params: { mesaId, dignidad: d, mesaNumero } })}
+              />
+              {mesa?.dignidadesRecibidas.includes(d) ? (
+                // S-04 / ADR-11: auditoría de las versiones de esta acta.
+                <AppButton
+                  label={`Historial de ${DIGNIDAD_LABELS[d].toLowerCase()}`}
+                  icon="history"
+                  variant="ghost"
+                  size="md"
+                  fullWidth={false}
+                  onPress={() => router.push({ pathname: '/coordinador-recinto/historial', params: { mesaId, dignidad: d, mesaNumero } })}
+                />
+              ) : null}
+            </View>
           ))}
         </View>
       </AppCard>
@@ -95,4 +108,4 @@ export default function MesaRecintoScreen() {
   );
 }
 
-const styles = StyleSheet.create({ lista: { gap: spacing.sm } });
+const styles = StyleSheet.create({ lista: { gap: spacing.sm }, acta: { gap: spacing.xxs } });

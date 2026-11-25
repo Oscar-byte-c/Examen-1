@@ -22,6 +22,8 @@ export const claves = {
   coordinadores: ['coordinadores'] as const,
   avance: ['avance'] as const,
   conteo: ['conteo'] as const,
+  resultadosRecinto: ['resultados-recinto'] as const,
+  historial: (mesaId: string, d: Dignidad) => ['historial', mesaId, d] as const,
   ubicaciones: ['ubicaciones'] as const,
   conflictos: ['conflictos'] as const,
   fotoEvidencia: (actaId: string, origen: string) => ['foto-evidencia', actaId, origen] as const,
@@ -122,6 +124,12 @@ export function useAsignarMesa(recintoId: string | null) {
 // ---- Seguimiento del escrutinio (RF-15) ----
 export const useAvance = () => useQuery({ queryKey: claves.avance, queryFn: () => container.obtenerAvance.execute() });
 export const useConteo = () => useQuery({ queryKey: claves.conteo, queryFn: () => container.obtenerConteo.execute() });
+/** RF-15: votos por candidato en cada recinto y totales generales (solo actas válidas del servidor). */
+export const useResultadosPorRecinto = () =>
+  useQuery({ queryKey: claves.resultadosRecinto, queryFn: () => container.obtenerResultadosPorRecinto.execute() });
+/** S-04 / ADR-11: versiones de un acta (la RLS solo responde a coordinadores con acceso a la mesa). */
+export const useHistorialActa = (mesaId: string, d: Dignidad) =>
+  useQuery({ queryKey: claves.historial(mesaId, d), queryFn: () => container.consultarHistorialActa.execute(mesaId, d) });
 export const useUbicaciones = () =>
   useQuery({ queryKey: claves.ubicaciones, queryFn: () => container.obtenerUbicacionesActas.execute() });
 export const useConflictos = () =>
@@ -149,7 +157,7 @@ export function useEscrutinioEnVivo() {
       // Agrupa ráfagas de eventos en una sola recarga.
       if (temporizador) clearTimeout(temporizador);
       temporizador = setTimeout(() => {
-        for (const k of [claves.avance, claves.conteo, claves.ubicaciones, claves.conflictos, ['mesas-recinto']]) {
+        for (const k of [claves.avance, claves.conteo, claves.resultadosRecinto, claves.ubicaciones, claves.conflictos, ['mesas-recinto'], ['historial']]) {
           void qc.invalidateQueries({ queryKey: k });
         }
       }, 800);
