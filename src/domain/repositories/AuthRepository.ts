@@ -1,4 +1,4 @@
-import type { SesionRestaurada, Usuario } from '../entities/Usuario';
+import type { ResultadoCambioClave, SesionRestaurada, Usuario } from '../entities/Usuario';
 
 /** Contrato de autenticación (ADR-01, ADR-02). La implementación usa Supabase Auth + Secure Store. */
 export interface AuthRepository {
@@ -9,8 +9,11 @@ export interface AuthRepository {
   restaurarSesion(): Promise<SesionRestaurada | null>;
   /** Notifica cuando la sesión termina (expiró, fue revocada o se cerró). Devuelve la función para desuscribirse. */
   observarCierre(callback: () => void): () => void;
-  /** Cambia la clave y borra la bandera de clave temporal (Edge Function). Devuelve el usuario actualizado. */
-  cambiarClave(clave: string): Promise<Usuario>;
+  /**
+   * Cambia la clave y borra la bandera de clave temporal (Edge Function). Lanza un error solo si
+   * la clave NO cambió; si cambió, devuelve si se pudo volver a ingresar automáticamente.
+   */
+  cambiarClave(clave: string): Promise<ResultadoCambioClave>;
   /** Envía el enlace de recuperación (solo para correos verificados). */
   solicitarRecuperacion(correo: string, urlRetorno: string): Promise<void>;
   /** Abre la sesión de recuperación a partir del enlace recibido por correo. */

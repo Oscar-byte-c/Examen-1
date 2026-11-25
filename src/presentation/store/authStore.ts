@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import type { Usuario } from '@/domain/entities/Usuario';
+import type { ResultadoCambioClave, Usuario } from '@/domain/entities/Usuario';
 import { container } from '@/data/di/container';
 
 import { queryClient } from './queryClient';
@@ -21,9 +21,13 @@ type AuthState = {
   usuario: Usuario | null;
   /** false cuando se arrancó sin red con el perfil en caché (RF-16). */
   verificada: boolean;
+  /** Mensaje informativo (no de error) que el login muestra una vez, p. ej. tras cambiar la clave. */
+  avisoLogin: string | null;
   inicializar: () => Promise<void>;
   iniciarSesion: (correo: string, clave: string) => Promise<void>;
-  cambiarClave: (clave: string, confirmacion: string) => Promise<void>;
+  /** Lanza error solo si la clave NO cambió. Con `sesion_iniciada`, la pantalla llama a `completarCambioClave`. */
+  cambiarClave: (clave: string, confirmacion: string) => Promise<ResultadoCambioClave>;
+  completarCambioClave: (usuario: Usuario) => void;
   entrarRecuperacion: (url: string) => Promise<void>;
   cerrarSesion: () => Promise<void>;
 };
@@ -40,6 +44,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   estado: 'inicializando',
   usuario: null,
   verificada: false,
+  avisoLogin: null,
 
   /** Idempotente: aunque se llame dos veces (modo estricto), solo hay un listener. */
   inicializar: async () => {
@@ -66,12 +71,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   iniciarSesion: async (correo, clave) => {
     const usuario = await container.iniciarSesion.execute(correo, clave);
     container.monitoreo.identificarUsuario(usuario.id);
-    set({ estado: 'autenticado', usuario, verificada: true });
+    set({ estado: 'autenticado', usuario, verificada: true, avisoLogin: null });
   },
 
   cambiarClave: async (clave, confirmacion) => {
-    const usuario = await container.cambiarClave.execute(clave, confirmacion);
-    set({ estado: 'autenticado', usuario, verificada: true });
+    const resultado = await container.cambiarClave.execute(clave, confirmacion);
+    if (resultado.tipo === 'reingreso_requerido') {
+      // La clave cambió, pero no se pudo reingresar solo: se va al login con un aviso claro.
+      limpiarDatosDeSesion();
+      set({
+        estado: 'no_autenticado',
+        usuario: null,
+        verificada: false,
+        avisoLogin: 'Tu clave se actualizó correctamente. Ingresa con tu nueva clave.',
+      });
+    }
+    // Con `sesion_iniciada` no se cambia de pantalla aún: la pantalla muestra primero el éxito.
+    return resultado;
+  },
+
+  completarCambioClave: (usuario) => {
+    container.monitoreo.identificarUsuario(usuario.id);
+    set({ estado: 'autenticado', usuario, verificada: true, avisoLogin: null });
   },
 
   entrarRecuperacion: async (url) => {

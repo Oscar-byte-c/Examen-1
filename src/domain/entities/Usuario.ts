@@ -18,6 +18,16 @@ export type Usuario = {
 /** Sesión restaurada. `verificada = false` cuando se arrancó sin red con el perfil en caché. */
 export type SesionRestaurada = { usuario: Usuario; verificada: boolean };
 
+/**
+ * Resultado de cambiar la clave (RF-02 / RF-04). En ambos casos la clave YA cambió en el servidor:
+ *  - sesion_iniciada: se volvió a ingresar con la clave nueva y se continúa en la app.
+ *  - reingreso_requerido: el reingreso automático no fue posible (p. ej. sin red); el usuario
+ *    debe ingresar manualmente con su clave nueva. No es un error.
+ */
+export type ResultadoCambioClave =
+  | { tipo: 'sesion_iniciada'; usuario: Usuario }
+  | { tipo: 'reingreso_requerido' };
+
 /** Persona supervisada (veedor o coordinador) tal como la ven sus superiores. */
 export type PersonaEquipo = {
   id: string;

@@ -75,6 +75,7 @@ const MENSAJES_FUNCIONES: Record<string, () => ErrorDominio> = {
   dato_duplicado: () => new DuplicadoError('Ya existe una cuenta con esos datos.'),
   clave_debil: () => new DatoInvalidoError('Usa al menos 8 caracteres, con letras y números.'),
   clave_repetida: () => new DatoInvalidoError('La nueva clave debe ser distinta de la anterior.'),
+  error_cambio_clave: () => new ErrorDominio('El servidor no pudo cambiar tu clave. Tu clave anterior sigue vigente; inténtalo de nuevo.'),
   correo_no_verificado: () => new SinPermisoError('Primero verifica tu correo con el enlace que te enviamos.'),
   sin_permiso: () => new SinPermisoError(),
   debe_cambiar_clave: () => new SinPermisoError('Primero cambia tu clave temporal.'),

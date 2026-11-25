@@ -1,5 +1,12 @@
 import { DatoInvalidoError } from '../entities/errores';
-import { loginSchema, nuevaClaveSchema, recuperacionSchema, type SesionRestaurada, type Usuario } from '../entities/Usuario';
+import {
+  loginSchema,
+  nuevaClaveSchema,
+  recuperacionSchema,
+  type ResultadoCambioClave,
+  type SesionRestaurada,
+  type Usuario,
+} from '../entities/Usuario';
 import type { AuthRepository } from '../repositories/AuthRepository';
 
 /** Primer mensaje de error de un safeParse de Zod, convertido en error de dominio. */
@@ -41,7 +48,7 @@ export class ObservarCierreSesion {
 /** RF-02 / ADR-01: cambio obligatorio de la clave temporal (y cambio tras una recuperación). */
 export class CambiarClave {
   constructor(private readonly auth: AuthRepository) {}
-  async execute(clave: string, confirmacion: string): Promise<Usuario> {
+  async execute(clave: string, confirmacion: string): Promise<ResultadoCambioClave> {
     const r = nuevaClaveSchema.safeParse({ clave, confirmacion });
     if (!r.success) throw primerError(r.error);
     return this.auth.cambiarClave(r.data.clave);
