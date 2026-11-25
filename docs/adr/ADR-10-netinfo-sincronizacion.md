@@ -1,59 +1,72 @@
-# ADR-10: NetInfo con cola local en SQLite para sincronizar automáticamente al recuperar la conexión
+# ADR-10: Usar NetInfo, una cola en SQLite y un UUID idempotente para sincronizar automáticamente
 
-| Dato | Detalle |
-|---|---|
-| Estado | **Aceptado** por consenso del equipo (reunión del 22/11/2026) |
-| Fuente | `docs/Documento_Consolidado_ADR.docx`, ficha 4.10 (numerada **ADR-0010** en el documento) |
-| Requerimientos relacionados | RF-14, RF-16, RNF-03, RNF-04, S-04 |
-| Minuto del video | No registrado en el documento grupal |
+## Estado
+Aceptado por consenso del equipo (Documento_Consolidado_ADR.docx, ficha 4.10, numerada «ADR-0010»).
 
-## 1. Contexto y problema
+## Fecha
+22/11/2026.
 
-Muchos veedores de recintos rurales no tienen señal al terminar el conteo. En procesos anteriores las actas se perdieron, o los usuarios reintentaron sin saber el estado y **duplicaron registros**.
+## Requisitos relacionados
+- **RF-14:** el estado exacto de cada envío.
+- **RF-16:** envío automático al recuperar la señal.
+- **RNF-03 y RNF-04:** sin pérdidas ni duplicados.
+- **S-04:** conflictos.
 
-La app debe:
-- detectar los cambios de conectividad;
-- guardar localmente cuando no hay red;
-- sincronizar **automáticamente** actas, fotos y reportes pendientes al volver la señal;
-- mostrar siempre el **estado exacto**.
+## Contexto
+Muchos veedores de recintos rurales no tienen señal al terminar el conteo. En procesos anteriores las actas se perdieron o, como los usuarios no sabían si el envío había funcionado, lo repetían y duplicaban registros.
 
-## 2. Decisión
+El ADR-03 decide **dónde** se guarda el acta sin señal. Este ADR decide **cuándo y cómo** se envía:
+- detectar que volvió la red;
+- enviar lo pendiente sin que el veedor tenga que acordarse;
+- que un envío cortado a la mitad pueda repetirse sin crear una segunda acta;
+- que dos avisos de red casi simultáneos no envíen lo mismo dos veces.
 
-Se combina **@react-native-community/netinfo** con una **cola transaccional en expo-sqlite** e **identificadores UUID idempotentes** por acta u operación. Al detectar conexión se sincroniza automáticamente y el estado se refleja en tiempo real.
+## Alternativas consideradas
+| Alternativa | Ventajas en este proyecto | Desventajas en este proyecto |
+|---|---|---|
+| **@react-native-community/netinfo con cola en SQLite e identificadores únicos por acta** (propuesta por Kevin Amagua) | Detecta cuándo se pierde y cuándo vuelve la red, y dispara el envío ordenado de las actas pendientes. Con un identificador único por operación, el servidor acepta cada acta una sola vez aunque se reintente. | Hay que programar la máquina de estados (guardado, en proceso, fallado) y los reintentos; agrega una dependencia más. |
+| Sincronización solo manual con un botón de reintento (propuesta por Jairo Maigua) | Evita detectar cambios de red en segundo plano; lógica más simple. | No cumple RF-16: depende de que el veedor vuelva a presionar el botón horas después de salir del recinto. |
 
-## 3. Alternativas consideradas
+## Decisión
+Se usa **NetInfo** combinado con una **cola transaccional en expo-sqlite** y un **UUID idempotente** por acta u operación. El envío se dispara automáticamente al detectar conexión y el estado se refleja en tiempo real. Hay que controlar la concurrencia para que dos avisos de red no procesen el mismo elemento de la cola a la vez. La opción manual se descartó porque no cumple el envío automático.
 
-| Alternativa | Propuesta por | Ventajas | Desventajas o limitaciones |
-|---|---|---|---|
-| **NetInfo + cola en SQLite + identificadores únicos por acta** ✅ | Kevin Amagua | Detecta la pérdida y la recuperación de la red y dispara el envío ordenado. Con un identificador por operación, el servidor acepta cada acta una sola vez aunque se reintente | Hay que programar la máquina de estados (guardado, en proceso, fallado) y los reintentos. Una dependencia más |
-| Sincronización solo manual con botón de reintento | Jairo Maigua | Evita detectar cambios de red en segundo plano; lógica más simple | No cumple RF-16: depende de que el veedor vuelva a presionar el botón horas después de salir del recinto |
+## Consecuencias
+- **Tener red no garantiza que el servidor responda** (precisión del 25/11): el acta solo queda «Enviada» cuando la RPC confirma.
+- **Detección de red:** `dispositivo.ts` considera conectado `isConnected && isInternetReachable !== false`, y lo expone al dominio mediante `DispositivoRepositories.ts` (caso de uso `ObservarConectividad`).
+- **Cuándo se intenta enviar** (`syncStore.ts`): al recuperar la red, al volver la app al primer plano, al iniciar sesión, **cada 60 s** mientras haya actas sin enviar y con el botón «Enviar ahora».
+- **Proceso de envío** (`ActaRepositoryImpl.ts`):
+  - la promesa `enCurso` impide dos procesamientos a la vez;
+  - la foto se sube a la ruta `{mesa}/{acta}/{operacion}.jpg`, y si ya existía se considera correcta;
+  - con un error de red el acta vuelve a «pendiente» con el **mismo** UUID;
+  - con otro error queda «fallida» y se reporta a Sentry (ADR-05).
+- **Idempotencia en el servidor** (`public.sincronizar_acta`): `operacion_id` es **único** en `actas_historial` y en `actas_conflictos`, así que un reintento recibe la misma respuesta sin crear otra versión. Antes de comparar versiones, la fila del acta se bloquea con `select … for update`.
+- **Otros detalles:** los estados visibles están en `etiquetas.ts` y el UUID lo genera `expo-crypto` (dependencia auxiliar, ADR_LINEA_BASE §4.9).
+- **Alcance:** la cola sincroniza actas y fotos. Los reportes de fallos sin conexión no pasan por ella, porque los guarda el SDK de Sentry (ADR-05).
+- **Limitaciones comprobadas en el código:**
+  - no hay espera progresiva (*backoff*) entre reintentos; la cola solo cuenta los `intentos`;
+  - un acta «fallida» por un error permanente (por ejemplo, sin permiso tras una reasignación) se reintenta **cada 60 s** indefinidamente mientras haya conexión, y cada fallo genera un reporte en Sentry; no existe un estado de «fallo definitivo»;
+  - si dos primeros envíos de la misma mesa coinciden, uno falla por `unique (mesa_id, dignidad)` y al reintentar queda como conflicto.
 
-## 4. Justificación
+## Verificación
+- **Automática, de forma indirecta:** `sesionLocal.test.ts`, que permite guardar sin red.
+- **Automática:** no hay prueba de la idempotencia.
+- **Pendiente:**
+  - en modo avión, sellar un acta, reconectar y comprobar que pasa a «Enviada» una sola vez;
+  - reenviar la misma operación y comprobar que existe una sola versión en el servidor.
 
-- RF-16 exige envío **automático**; la opción manual no lo cumple.
-- El identificador por operación hace que el reintento sea **seguro**: el servidor reconoce la operación ya aplicada y no duplica.
+## Uso de IA
+La revisión con IA se hizo el 25/11/2026, después del consenso del 22/11.
+- **ChatGPT** estuvo de acuerdo, pero advirtió que conectividad no es lo mismo que backend disponible. Recomendó un diagrama de estados de la cola, *backoff*, separar errores recuperables de permanentes y que el UUID no cambie entre reintentos.
+- **Gemini** la aprobó con mejoras de resiliencia. Mencionó los portales cautivos y la operación compuesta de Storage + base de datos. Advirtió de los bucles de reintento ante errores 4xx permanentes y propuso los estados `PENDING`, `IN_FLIGHT`, `SYNCED` y `FAILED_PERMANENT` con *backoff* exponencial.
+- **Claude**, que participó en la redacción (no es un revisor independiente), verificó en el código que ya se cumple:
+  - el UUID estable en los reintentos;
+  - `operacion_id` único en el servidor;
+  - el bloqueo `for update`;
+  - `isInternetReachable`;
+  - la subida idempotente de la foto.
 
-## 5. Consecuencias
+  También **confirmó** la advertencia de Gemini: un acta fallida se reintenta cada 60 s y no existe un estado de fallo definitivo.
 
-**Positivas**
-- Ningún acta se pierde por falta de señal y se eliminan los duplicados al reintentar.
-
-**Negativas / obligaciones**
-- Hay que **controlar la concurrencia** para que dos avisos de red simultáneos no procesen el mismo elemento de la cola a la vez.
-
-## 6. Relación con el examen
-
-- **Rúbrica:** «Registro de resultados… con garantías de confiabilidad» (3 pts) y «Retroalimentación visual… en proceso, exitosas, fallidas» (2 pts).
-- **Enunciado:** «Cada persona tiene que saber en todo momento si lo que hizo está en proceso, se guardó o falló».
-
-## 7. Evidencia de implementación
-
-| Qué | Dónde |
-|---|---|
-| Detección de red | `src/data/datasources/local/dispositivo.ts` (NetInfo) y `src/data/repositories/DispositivoRepositories.ts` |
-| Control de concurrencia (un solo procesamiento de la outbox a la vez) | `ActaRepositoryImpl.ts`: la promesa `enCurso` se reutiliza si ya hay una sincronización en marcha |
-| Idempotencia en el servidor | `public.sincronizar_acta(p_operacion_id, …)`: si la operación ya se aplicó, responde lo mismo sin duplicar |
-| UUID | `expo-crypto` (dependencia auxiliar, `ADR_LINEA_BASE.md` §4.9) |
-| Estados visibles («Guardada, por enviar», «Enviando», «Enviada», «Falló el envío», «En revisión del coordinador») | `src/presentation/screens/actas/etiquetas.ts`, `src/presentation/store/syncStore.ts` |
-
-**Alcance:** la cola sincroniza **actas y fotos**. Los reportes de fallos sin conexión no pasan por esta cola: los guarda y reenvía el propio SDK de Sentry (ADR-05). Sin otras diferencias con lo acordado.
+Las tres mantienen el patrón del equipo.
+- **Recomendaciones válidas, no implementadas:** el *backoff* y el estado de fallo definitivo. Quedan como mejora y no cambian la decisión.
+- **Alternativa mencionada por ChatGPT, no evaluada por el equipo:** enviar directamente al detectar red, sin cola. ChatGPT la considera insuficiente.

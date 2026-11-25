@@ -1,77 +1,84 @@
-# ADR-11: Modelo de datos, roles y aislamiento por recinto (PostgreSQL en Supabase + RLS)
+# ADR-11: Usar PostgreSQL en Supabase con RLS para el modelo de datos y el aislamiento por recinto
 
-| Dato | Detalle |
-|---|---|
-| Estado | **Aceptado** por consenso del equipo (reunión del 22/11/2026) |
-| Fuente | `docs/Documento_Consolidado_ADR.docx`, ficha 4.11 |
-| Requerimientos relacionados | RF-06, RF-07, RF-08, RF-18, RF-19, RF-20, S-02, S-03, S-05 |
-| Minuto del video | No registrado en el documento grupal |
+## Estado
+Aceptado por consenso del equipo (Documento_Consolidado_ADR.docx, ficha 4.11).
 
-## 1. Contexto y problema
+## Fecha
+22/11/2026.
 
-El proceso electoral tiene una estructura muy relacionada: un recinto tiene varias mesas; cada mesa tiene un veedor y genera dos actas (alcaldía y prefectura); cada acta reporta votos por organización. Cada usuario tiene un rol y una jurisdicción. Si esto se guarda de forma desordenada, una mesa puede quedar asociada a dos veedores o un acta puede registrarse dos veces.
+## Requisitos relacionados
+- **RF-06 y RF-07:** recintos con un único coordinador.
+- **RF-08 y RF-20:** un veedor por mesa y reemplazo inmediato.
+- **RF-18:** cada rol ve y modifica solo lo suyo.
+- **RF-19:** números imposibles.
+- **S-02:** mesa reportada con sus 2 actas.
+- **S-03:** validación que bloquea.
+- **S-05:** el veedor reemplazado pierde el acceso.
 
-Además:
-- en un proceso anterior, información de algunas mesas llegó a personas que no debían verla. La restricción **no puede depender de la pantalla**: el servidor debe impedir que un veedor lea o cambie mesas ajenas y que un coordinador acceda a otro recinto (RF-18);
-- el modelo debe respetar las reglas matemáticas (RF-19);
-- una mesa con una sola acta es **parcialmente reportada** (S-02);
-- si se reemplaza a un veedor, el anterior **pierde el acceso** a esa mesa (S-05).
+## Contexto
+La estructura del proceso electoral está muy relacionada: un recinto tiene varias mesas; cada mesa tiene un veedor y genera dos actas, alcaldía y prefectura; cada acta reporta los votos de cada organización. Cada usuario tiene además un rol y una jurisdicción. Si esta información se guarda de forma desordenada, es fácil que una mesa quede con dos veedores o que una misma acta se registre dos veces.
 
-## 2. Decisión
+En un proceso anterior, información de algunas mesas llegó a personas que no debían verla. Por eso la restricción no puede depender de lo que muestra la pantalla: el servidor debe impedir que un veedor lea o cambie mesas que no son suyas y que un coordinador acceda a otro recinto. El coordinador provincial, en cambio, necesita ver el avance y el conteo de toda su jurisdicción casi en tiempo real.
 
-Se elige **PostgreSQL en Supabase**:
+## Alternativas consideradas
+| Alternativa | Ventajas en este proyecto | Desventajas en este proyecto |
+|---|---|---|
+| **PostgreSQL en Supabase con tablas relacionales, Row Level Security y restricciones de unicidad** (propuesta por Jairo Maigua y Milka Borja) | Las tablas reflejan el proceso real. Una restricción única sobre mesa y dignidad impide duplicar un acta. La RLS obliga al servidor a filtrar cada consulta por rol y recinto, y Realtime permite el conteo en vivo. | Las políticas deben diseñarse bien: una política mal escrita deja datos abiertos o bloquea consultas legítimas. Las consultas agregadas pueden ser lentas sin totales precalculados. |
+| Firestore con documentos anidados (propuesta por Kevin Amagua) | Escala bien en lecturas en tiempo real y tiene reglas por documento. | No tiene relaciones nativas: unir mesas, recintos y actas obliga a duplicar datos o a hacer varias consultas. Verificar que un veedor pertenece a un recinto requiere reglas complejas, y la validación de sumas es difícil de garantizar. |
+| Backend propio que valida las reglas en código, sin RLS (propuesta por Oscar Vázquez) | Cualquier regla se escribe en el lenguaje que domina el equipo. | Si la app consulta la base directamente en algún punto, la seguridad queda incompleta. Hay que mantener y desplegar un servidor adicional. |
 
-- Tablas principales: recintos, mesas, usuarios, asignaciones de veedores, actas, organizaciones, candidatos y votos.
-- Una **restricción única sobre mesa y dignidad** garantiza como máximo dos actas válidas por mesa.
-- **Row Level Security**: un veedor solo consulta y modifica las actas de sus mesas; un coordinador de recinto, solo las de su recinto.
-- El coordinador provincial tiene **lectura** sobre su jurisdicción, pero **no puede modificar actas**.
-- Al reemplazar a un veedor, la asignación anterior se **revoca de inmediato** y el **historial** de las actas ya registradas se conserva para auditoría.
+## Decisión
+Se usa **PostgreSQL en Supabase**:
+- Las tablas principales son recintos, mesas, usuarios, asignaciones de veedores, actas, organizaciones, candidatos y votos.
+- La restricción única sobre mesa y dignidad garantiza como máximo dos actas válidas por mesa.
+- La RLS aísla los datos: un veedor solo consulta y modifica las actas de sus mesas; un coordinador de recinto, solo las de su recinto; el provincial lee su jurisdicción pero **no modifica actas**.
+- Al reemplazar a un veedor, la asignación anterior se revoca de inmediato y el historial de las actas ya registradas se conserva.
 
-## 3. Alternativas consideradas
+Firestore se descartó porque el dominio es relacional, y el backend propio, por el costo de mantener otro servidor y el riesgo de dejar la base expuesta.
 
-| Alternativa | Propuesta por | Qué aporta | Limitaciones y por qué no se eligió |
-|---|---|---|---|
-| **PostgreSQL en Supabase con tablas relacionales, RLS y restricciones de unicidad** ✅ | Jairo Maigua y Milka Borja | Las tablas reflejan el proceso real; la unicidad mesa + dignidad impide duplicados; RLS filtra cada consulta por rol y recinto; Realtime permite el conteo en vivo | Hay que diseñar bien las políticas: una política mal escrita deja datos abiertos o bloquea consultas legítimas. Las consultas agregadas pueden ser lentas sin totales precalculados |
-| Firestore con documentos anidados | Kevin Amagua | Escala bien en lecturas en tiempo real; reglas de acceso por documento | Sin relaciones nativas: hay que duplicar datos o hacer varias consultas; verificar que un veedor pertenece a un recinto exige reglas complejas; la validación de sumas es difícil de garantizar |
-| Backend propio que valida en código, sin RLS | Oscar Vázquez | Cualquier regla de negocio en el lenguaje que el equipo domina | Si la app consulta la base directamente en algún punto, la seguridad queda incompleta; hay que mantener y desplegar un servidor adicional |
+## Consecuencias
+- **Esquema** (`supabase/migrations/20261122120000_territorio_actas.sql`):
+  - tablas `recintos`, `mesas`, `asignaciones_mesa`, `organizaciones`, `candidatos`, `actas`, `votos_acta`, `actas_historial` y `actas_conflictos`; la tabla `perfiles` está en `20261121213533_crear_perfiles.sql`;
+  - restricciones `unique (mesa_id, dignidad)`, `perfiles_un_coordinador_por_recinto` y `asignaciones_una_activa_por_mesa`.
+- **La app no escribe directo** (ADR-C02 §4):
+  - no tiene permisos `INSERT` ni `UPDATE` sobre las actas; todo pasa por RPC `SECURITY DEFINER` con `search_path = ''`: `public.sincronizar_acta`, `public.asignar_mesa`, `public.resolver_conflicto` y `public.crear_recinto`;
+  - esas funciones revalidan el rol y el ámbito con `auth.uid()` mediante `privado.puede_editar_mesa`;
+  - un acta son varias filas (el acta, sus votos y el historial) y la RPC las escribe en una sola transacción. La RLS queda como segunda barrera.
+- **Qué impone la base y qué la RPC** (precisión del 25/11): la base impone la **unicidad** y los valores no negativos. La **suma** de votos y la dignidad de cada candidato las valida la RPC (`privado.validar_acta`), no un `CHECK`. Así se precisa la frase del documento grupal «la base impide duplicados y sumas imposibles».
+- **Revocación inmediata:** `privado.puede_ver_mesa` y `puede_editar_mesa` leen `perfiles` y `asignaciones_mesa` en cada consulta. Al reasignar una mesa, el veedor anterior la pierde al instante; solo la bandera de clave temporal sale del token (ADR-01).
+- **Correcciones:** una corrección es un `UPDATE` de la misma fila con `version + 1` y una nueva fila en `actas_historial`, así que la unicidad no impide corregir.
+- **Historial (S-04):**
+  - la política `historial_lectura` solo deja leerlo a los coordinadores con acceso a la mesa;
+  - se muestra en `src/presentation/screens/actas/HistorialActaScreen.tsx`, con los cambios entre versiones calculados por `cambiosEntreVersiones` (`src/domain/entities/Historial.ts`);
+  - el coordinador de recinto lo abre desde la mesa; el provincial, desde Recintos → «Mesas e historial» (`MesasHistorialScreen.tsx`).
+- **Fotos y lectura:**
+  - Storage tiene su propia política, `fotos_actas_lectura`;
+  - las RPC de lectura `public.avance_por_recinto` y `public.conteo_por_candidato` son `security invoker`: la RLS filtra lo que cada rol ve.
+- **Datos iniciales:** `supabase/seed.sql` (Pichincha – Quito, 5 recintos × 4 mesas y 5 organizaciones ficticias).
+- **Riesgos y limitaciones:**
+  - no hay diagrama entidad-relación (el modelo está comentado en la migración) ni una matriz de permisos rol × acción × tabla;
+  - la RLS no protege los datos que ya están en el teléfono (ADR-03);
+  - si alguien escribiera con la `service_role`, la suma no la impediría la base;
+  - no hay totales precalculados; con 20 mesas no se nota, pero no se midió.
 
-## 4. Justificación
+## Verificación
+- **Servidor:** `supabase/tests/verificar-rls.mjs` entra con los 3 roles y prueba accesos permitidos y negados: el veedor solo ve sus 2 mesas, el recinto solo su recinto, el provincial no puede modificar actas y el servidor rechaza un acta imposible. Dio **27/27 el 22/11** según `CONTEXTO_PROYECTO.md`, **sin log adjunto**.
+- **Automática:** `historial.test.ts` (5 pruebas) cubre los cambios entre versiones.
+- **Pendiente:**
+  - ejecutar `npm run test:rls` con las 5 comprobaciones nuevas (historial y votos por recinto) y guardar la salida con fecha;
+  - elaborar el diagrama entidad-relación y la matriz de permisos.
 
-- El modelo relacional refleja la estructura real (recinto → mesa → acta → votos) e impide duplicados **en la base**.
-- RLS hace que **el servidor decida qué ve cada usuario**, que es la respuesta directa a la filtración de información del proceso anterior.
+## Uso de IA
+La revisión con IA se hizo el 25/11/2026, después del consenso del 22/11.
+- **ChatGPT** estuvo de acuerdo y la consideró una de las decisiones mejor justificadas. Pidió una matriz rol–acción–recurso, documentar qué funciones usan `SECURITY DEFINER` y con qué `search_path`, adjuntar los resultados de RLS con fecha y explicar cómo convive la unicidad con las correcciones.
+- **Gemini** la aprobó como el pilar central. Advirtió que las funciones `SECURITY DEFINER` omiten la RLS y deben validar `auth.uid()`. Recomendó `SET search_path = public, privado`, una matriz SELECT/INSERT/UPDATE/DELETE por rol y evidencia con JWT reales.
+- **Claude**, que participó en la redacción (no es un revisor independiente), verificó:
+  - el `search_path = ''`;
+  - la validación de `auth.uid()` dentro de las RPC;
+  - la revocación inmediata;
+  - que una corrección es un `UPDATE` con historial.
 
-## 5. Consecuencias
-
-**Positivas**
-- Integridad y consistencia: la base impide duplicados y sumas imposibles.
-- El servidor decide qué ve cada usuario.
-- Conteo en vivo como referencia rápida mientras el CNE termina su proceso.
-
-**Negativas / obligaciones**
-- Las políticas de seguridad son la parte más delicada y deben **probarse con usuarios de cada rol** antes de la defensa.
-- Los totales precalculados requieren recalcular al corregir un acta.
-- Obliga a **documentar el modelo entidad-relación** y las políticas, y a preparar datos de prueba que demuestren que un veedor no ve otra mesa.
-
-## 6. Relación con el examen
-
-- **Rúbrica:** «Gestión del recinto» (1,6), «Gestión del territorio y seguimiento» (1,6) y la confidencialidad que exige el enunciado.
-- **Enunciado, sección «Confidencialidad de la información».**
-
-## 7. Evidencia de implementación
-
-| Qué | Dónde (`supabase/migrations/20261122120000_territorio_actas.sql`) |
-|---|---|
-| Tablas | `recintos`, `mesas`, `asignaciones_mesa`, `organizaciones`, `candidatos`, `actas`, `votos_acta`, `actas_historial`, `actas_conflictos` (+ `perfiles` en `20261121213533_crear_perfiles.sql`) |
-| Máximo 2 actas por mesa | `unique (mesa_id, dignidad)` en `actas` |
-| Un coordinador por recinto (RF-07) | índice `perfiles_un_coordinador_por_recinto` |
-| Una asignación activa por mesa (RF-08, S-05) | índice `asignaciones_una_activa_por_mesa` + RPC `public.asignar_mesa` |
-| Permisos | `privado.puede_ver_mesa` y `privado.puede_editar_mesa` (el provincial no edita) |
-| Escritura única y transaccional | RPC `public.sincronizar_acta` (la app no tiene `INSERT`/`UPDATE` directos) |
-| Pruebas por rol | `supabase/tests/verificar-rls.mjs` (27/27 «PASA» el 22/11/2026, según `CONTEXTO_PROYECTO.md`) |
-| Datos precargados | `supabase/seed.sql` (Pichincha – Quito, 5 recintos × 4 mesas, 5 organizaciones ficticias) |
-
-**Aclaraciones y diferencias**
-- **Totales:** no se crearon tablas de totales precalculados. El avance y el conteo se calculan al consultar (`public.avance_por_recinto`, `public.conteo_por_candidato`). El documento lo menciona como consecuencia, no como decisión; con 20 mesas el cálculo directo es suficiente.
-- **Modelo entidad-relación:** el modelo y las políticas están documentados en la propia migración (comentarios SQL); no hay un diagrama entidad-relación aparte.
-- **Historial (corregido el 24/11):** `actas_historial` ya se escribía en la misma transacción que cada versión. Ahora existe la pantalla **«Historial»** (`src/presentation/screens/actas/HistorialActaScreen.tsx`), de solo lectura, con cada versión: autor (nombre y rol), fecha, cifras, votos, lugar de captura y **qué cambió** respecto de la anterior (`cambiosEntreVersiones`, `src/domain/entities/Historial.ts`, con pruebas). Se distingue la versión **vigente**. La abren el coordinador de recinto (mesa → «Historial») y el provincial (Recintos → «Mesas e historial» → «Historial», `MesasHistorialScreen.tsx`, solo lectura y sin resultados de votos). La política `historial_lectura` ya limitaba la lectura a coordinadores con acceso a la mesa; del autor solo se piden nombre, apellidos y rol. Se agregaron 3 comprobaciones de solo lectura a `verificar-rls.mjs` (veedor sin historial, recinto solo el suyo y, como control de integridad, suma de votos de las actas = total general). Pendiente: ejecutar `npm run test:rls` y la prueba manual.
-- **Decisión de implementación (`ADR-C02` §4):** todas las escrituras pasan por RPC `SECURITY DEFINER` que revalidan rol, ámbito y datos.
+Las tres mantienen la decisión del equipo.
+- **Se aceptaron:** la matriz de permisos y la evidencia reproducible (pendientes) y la precisión sobre qué impone la base y qué la RPC.
+- **Se descartó:** la sugerencia de Gemini `search_path = public, privado`, porque el `''` actual es más estricto (obliga a escribir cada objeto con su esquema) y es lo que recomienda Supabase.
+- **Ninguna IA propuso otra tecnología.**

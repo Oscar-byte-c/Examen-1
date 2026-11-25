@@ -1,60 +1,60 @@
-# ADR-09: Zod para validar cédulas, correos y la coherencia numérica de las actas
+# ADR-09: Usar Zod para validar cédulas, correos y la coherencia numérica de las actas
 
-| Dato | Detalle |
-|---|---|
-| Estado | **Aceptado** por consenso del equipo (reunión del 22/11/2026) |
-| Fuente | `docs/Documento_Consolidado_ADR.docx`, ficha 4.9 (numerada **ADR-009** en el documento) |
-| Requerimientos relacionados | RF-02, RF-10, RF-12, RNF-02, S-02 (tal como figuran en el documento grupal) |
-| Minuto del video | No registrado en el documento grupal |
+## Estado
+Aceptado por consenso del equipo (Documento_Consolidado_ADR.docx, ficha 4.9, numerada «ADR-009»).
 
-## 1. Contexto y problema
+## Fecha
+22/11/2026.
 
-En elecciones anteriores:
-- se registraron **cédulas mal digitadas** que impidieron identificar quién reportó ciertas actas;
-- se enviaron actas con **cifras imposibles**, como un candidato con más votos que el total de sufragantes o sumas inconsistentes.
+## Requisitos relacionados
+- **RF-02:** cédula ecuatoriana y datos personales válidos.
+- **RF-10 y RF-19:** detectar e impedir números imposibles.
+- **S-03:** la validación matemática bloquea el guardado.
+- **RNF-02.**
+- El documento grupal también lista **RF-12** y **S-02**.
 
-La app debe detectar estos errores **en el momento** en que se ingresan o corrigen los datos, tanto en las pantallas como al validar las entidades bajo Clean Architecture.
+## Contexto
+En la elección anterior se registraron cédulas mal digitadas y después no se pudo saber quién había reportado ciertas actas. También llegaron actas con cifras imposibles: una organización con más votos que el total de sufragantes, o sumas que no cuadraban.
 
-## 2. Decisión
+Hay que detectar esos errores en el momento en que se escriben o se corrigen, no días después. Las mismas reglas aparecen en varios flujos: alta de usuarios, actas de alcaldía, actas de prefectura y corrección de actas. Si cada pantalla las programara por su cuenta, tarde o temprano alguna quedaría sin una regla.
 
-Se elige **Zod** para **centralizar** los esquemas de validación de usuarios y actas, que se ejecutan **antes de guardar o enviar** cualquier registro.
+## Alternativas consideradas
+| Alternativa | Ventajas en este proyecto | Desventajas en este proyecto |
+|---|---|---|
+| **Zod** (propuesta por Milka Borja) | Esquemas reutilizables con reglas cruzadas: valida el dígito verificador y la relación entre votos, blancos, nulos y total de sufragantes. | Una dependencia más, y obliga a mantener sincronizados los mensajes de error con la interfaz. |
+| Yup (propuesta por Jairo Maigua) | Valida esquemas y condiciones entre campos, con una API conocida. | Infiere los tipos de TypeScript con menos precisión y expresa con más dificultad las validaciones cruzadas del escrutinio. |
+| Validaciones manuales con `if` y `else` (propuesta por Oscar Vázquez) | Sin librerías; cada regla visible en el código. | Las reglas se repetirían en usuarios, en alcaldía, en prefectura y en las correcciones, y cada repetición aumenta el riesgo de olvidar una regla en algún flujo. |
 
-## 3. Alternativas consideradas
+## Decisión
+Se usa **Zod** para centralizar los esquemas de validación de usuarios y actas, que se ejecutan antes de guardar o enviar cualquier registro. Yup se descartó porque las reglas cruzadas del acta se expresan peor y con tipos menos precisos, y las validaciones manuales, por el riesgo de olvidar una regla en alguno de los flujos.
 
-| Alternativa | Propuesta por | Ventajas | Desventajas o limitaciones |
-|---|---|---|---|
-| **Zod** ✅ | Milka Borja | Esquemas reutilizables con reglas cruzadas: valida el dígito verificador, votos, nulos, blancos y total de sufragantes | Una dependencia más; hay que mantener sincronizados los mensajes de error con la interfaz |
-| Yup | Jairo Maigua | Valida esquemas y condiciones entre campos; API conocida | Infiere tipos de TypeScript con menos precisión y expresa con más dificultad las validaciones cruzadas del escrutinio |
-| Validaciones manuales con `if` y `else` | Oscar Vázquez | Sin librerías; cada regla visible en el código | Las reglas se repetirían en usuarios, en actas de alcaldía y prefectura y en las correcciones; cada repetición aumenta el riesgo de olvidar una regla |
+## Consecuencias
+- **Los esquemas viven en el dominio** (`src/domain/entities`), porque son reglas de negocio y Zod es TypeScript puro: se prueban sin React ni Supabase (ADR-C02 §7).
+  - `Acta.ts` (`crearFormularioActaSchema`): sin negativos ni decimales, ningún candidato por encima del total y válidos + blancos + nulos = total.
+  - `cedula.ts`: dígito verificador, módulo 10.
+  - `Usuario.ts`: correo, teléfono, nombres y clave.
+- **Unión con el formulario:** los esquemas se conectan a React Hook Form (ADR-08) con `@hookform/resolvers`.
+- **S-03 / RF-19:** con una suma imposible, el acta no se puede sellar.
+- **La frontera de seguridad es el servidor** (precisión del 25/11): Zod protege la experiencia del usuario, pero una petición manipulada podría saltarse la app.
+  - `privado.validar_acta`, llamada dentro de la RPC `public.sincronizar_acta`, repite la suma, los negativos, el tope por candidato, la dignidad de cada candidato y el GPS obligatorio.
+  - Las reglas de usuario se repiten en la Edge Function `crear-usuario`.
+  - La suma **no** es una restricción `CHECK` de la tabla: la tabla solo tiene `check (>= 0)`.
+- **Riesgo:** si una regla cambia en Zod y no en `validar_acta`, o al revés, divergen sin aviso. Hay que mantenerlas iguales.
 
-## 4. Justificación
+## Verificación
+- **Automática:** `reglas.test.ts` (parte de sus 38 pruebas) cubre:
+  - la cédula ecuatoriana;
+  - la validación matemática: acepta un acta coherente y rechaza negativos, candidatos por encima del total, sumas que no cuadran y candidatos faltantes;
+  - los esquemas de usuario.
+- **Servidor:** `verificar-rls.mjs` comprueba que el servidor rechaza un acta matemáticamente imposible. Dio 27/27 el 22/11, sin log adjunto.
+- **Pendiente:** ninguna prueba específica adicional.
 
-- Una **sola definición** de cada regla se reutiliza al crear y al corregir actas, evitando el riesgo de las validaciones manuales repetidas.
-- Expresa mejor que Yup las **reglas cruzadas** (válidos + blancos + nulos = sufragantes).
+## Uso de IA
+La revisión con IA se hizo el 25/11/2026, después del consenso del 22/11.
+- **ChatGPT** estuvo de acuerdo. Recordó que la validación en el cliente no es una frontera de seguridad y pidió documentar qué reglas viven en Zod y cuáles también en PostgreSQL o en la RPC.
+- **Gemini** la aprobó con una advertencia de frontera. Destacó `.refine()` y `.superRefine()` para la coherencia aritmética, pidió mapear las reglas del cliente frente a las del servidor e incluir casos borde. Habló de replicar las reglas en restricciones `CHECK` o en la RPC.
+- **Claude**, que participó en la redacción (no es un revisor independiente), comprobó que la réplica está en la RPC (`validar_acta`) y no en un `CHECK`. Por eso la afirmación de Gemini de que «las restricciones SQL replican las invariantes» es inexacta.
 
-## 5. Consecuencias
-
-**Positivas**
-- Se bloquean en tiempo real las cédulas inválidas y las actas matemáticamente imposibles, con las mismas reglas al crear y al corregir.
-
-**Negativas / obligaciones**
-- Se incorpora una librería externa.
-- Los esquemas deben mantenerse **desacoplados de la UI** para no mezclar interfaz con reglas de validación.
-
-## 6. Relación con el examen
-
-- **Rúbrica:** «Acceso de los usuarios» (cédula y correo) y «Registro de resultados» (validación numérica).
-- **S-03:** la validación matemática **bloquea** el guardado.
-- **RF-19:** sin negativos, ningún candidato por encima del total, suma igual al total.
-
-## 7. Evidencia de implementación
-
-| Qué | Dónde |
-|---|---|
-| Esquema del acta con reglas cruzadas | `src/domain/entities/Acta.ts` (`crearFormularioActaSchema`) |
-| Cédula ecuatoriana | `src/domain/entities/cedula.ts` |
-| Esquemas de usuario (correo, teléfono, nombres) | `src/domain/entities/Usuario.ts` |
-| Pruebas | `src/domain/__tests__/reglas.test.ts` |
-| La misma regla en el servidor | `privado.validar_acta` dentro de `public.sincronizar_acta`; Edge Function `crear-usuario` |
-
-**Aclaración registrada:** los esquemas viven en `domain/entities` porque son reglas de negocio y Zod es TypeScript puro, así que el dominio sigue sin depender de React ni de Supabase (`ADR-C02` §7). Sin diferencias con lo acordado.
+Las tres coinciden con la decisión.
+- **Se aceptó:** documentar qué reglas tiene cada lado (en «Consecuencias»).
+- **Se corrigió:** la suposición de que existen restricciones `CHECK` para la suma.

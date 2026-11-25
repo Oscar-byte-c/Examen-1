@@ -1,72 +1,54 @@
-# ADR-02: Supabase + SMTP personalizado para la creación de cuentas, la verificación del correo y la recuperación de la clave
+# ADR-02: Usar Supabase con SMTP personalizado para verificar el correo y recuperar la clave por enlace
 
-| Dato | Detalle |
-|---|---|
-| Estado | **Aceptado** por consenso del equipo (reunión del 22/11/2026) |
-| Fuente | `docs/Documento_Consolidado_ADR.docx`, ficha ADR-02 |
-| Requerimientos relacionados | RF-01, RF-03, RF-04, RNF-02 |
-| Minuto del video | No registrado en el documento grupal |
+## Estado
+Aceptado por consenso del equipo (Documento_Consolidado_ADR.docx, ficha ADR-02).
 
-## 1. Contexto y problema
+## Fecha
+22/11/2026.
 
-- Nadie se registra por su cuenta: el coordinador provincial crea las cuentas de los coordinadores de recinto y estos las de sus veedores.
-- Como otra persona crea la cuenta, el titular todavía no demostró que el correo es suyo. El correo es el único medio confiable de comunicación, así que hay que confirmar que **existe y le pertenece** antes de permitir el ingreso.
-- Los enlaces de verificación y recuperación deben ser **únicos, con expiración y de un solo uso**, para que terceros no cambien credenciales ajenas.
-- La recuperación solo debe estar disponible para **correos ya verificados**; si no, cualquiera podría intentar tomar una cuenta ajena.
-- Muchos veedores no dominan la tecnología: sin recuperación autónoma, el coordinador provincial pasa horas en llamadas.
+## Requisitos relacionados
+- **RF-01:** las cuentas las crean terceros, no el titular.
+- **RF-03:** el correo debe verificarse con un enlace.
+- **RF-04:** la clave se recupera por enlace, solo para correos verificados.
+- **RNF-02:** las credenciales del SMTP no pueden estar en la app.
 
-## 2. Decisión
+## Contexto
+Como la cuenta la crea otra persona, el titular todavía no demostró que el correo es suyo. Para la organización el correo es el único medio confiable de contacto, así que hay que confirmar que existe y le pertenece **antes** de permitir el ingreso.
 
-Se elige **Supabase con SMTP personalizado**:
+Los enlaces de verificación y de recuperación deben ser únicos, de un solo uso y con fecha de vencimiento. Si no, un tercero podría reutilizarlos para cambiar una credencial ajena. Además, la recuperación solo debe ofrecerse a correos ya verificados; de lo contrario, alguien podría pedir el enlace de una cuenta que no es suya. Por último, muchos veedores no se manejan bien con la tecnología: si la recuperación no es autónoma, terminan llamando al coordinador provincial.
 
-- Supabase genera enlaces de **uso único** y con **tiempo de vida limitado**.
-- La verificación se completa **antes** de permitir el ingreso.
-- La recuperación solo se ofrece para un **correo ya verificado**.
-- El SMTP propio envía los correos desde el dominio de la organización, con **plantillas en español**.
-- Con el registro público deshabilitado (ADR-01), el correo de verificación solo se dispara al **crear la cuenta desde el servidor**.
-- Las credenciales del SMTP se guardan en la configuración del servicio, **nunca en la app** (RNF-02).
+## Alternativas consideradas
+| Alternativa | Ventajas en este proyecto | Desventajas en este proyecto |
+|---|---|---|
+| **Supabase + SMTP personalizado** (propuesta por Jairo Maigua) | Supabase envía la verificación y la recuperación sin código extra. Sus tokens son de un solo uso y vencen solos. Con un SMTP propio los correos salen de la organización y en español. | La plantilla es poco personalizable. Hay que validar que el flujo del correo no choque con la clave temporal. |
+| Firebase Authentication (propuesta por Kevin Amagua) | Autenticación, Firestore y Cloud Storage funcionan bien con React Native. | Al ser NoSQL, las consultas relacionales que necesita el sistema (recinto → mesa → acta) son más complejas e incómodas. |
 
-## 3. Alternativas consideradas
+## Decisión
+Se usa **Supabase con SMTP personalizado**. Supabase genera enlaces de un solo uso con tiempo de vida limitado; la verificación se completa antes de permitir el ingreso y la recuperación solo se ofrece a correos verificados. Con el registro público deshabilitado (ADR-01), el correo de verificación solo se envía cuando la cuenta se crea desde el servidor. Las credenciales del SMTP se guardan en la configuración del servicio, nunca en la app.
 
-| Alternativa | Propuesta por | Ventajas | Desventajas o limitaciones |
-|---|---|---|---|
-| **Supabase + SMTP personalizado** ✅ | Jairo Maigua | Envía los correos de verificación y recuperación sin código extra; tokens de uso único con límite de vida | Plantilla poco personalizable. Hay que validar que el flujo del correo no entre en conflicto con la clave temporal |
-| Firebase Authentication | Kevin Amagua | Autenticación y herramientas (Firestore, Cloud Storage) que funcionan bien con React Native | Al ser NoSQL, las consultas relacionales que requiere el sistema son más complejas e incómodas |
+## Consecuencias
+- **Sin tokens propios:** no hubo que programar ni guardar códigos.
+- **Enlace en lugar de OTP:** reemplazó al código OTP de la línea base anterior (ADR_LINEA_BASE §4.8).
+- **Orden del alta:** la cuenta se crea primero (con la clave temporal) y la invitación se envía al final. Así lo hace `crear-usuario` (ADR-C02 §2) porque, en Supabase Auth, asignar una clave después de invitar invalida el enlace; ese error apareció en las pruebas del 22/11 (`otp_expired`).
+- **Recuperación sin revelar cuentas:** la Edge Function `solicitar-recuperacion` solo envía el enlace si el correo existe y está verificado, consultado con la RPC `public.correo_verificado`, que solo puede ejecutar la `service_role`. Siempre responde el mismo mensaje y tarda 1,5 s, para no revelar qué correos existen.
+- **Configuración fuera del código:** el SMTP (Gmail), las plantillas y las *Redirect URLs* se configuran en el panel de Supabase. El repositorio no lo demuestra; hay que comprobarlo en el servicio.
+- **Pantallas:** la recuperación se pide en `app/recuperar-clave.tsx`.
+- **El enlace abre la app:** el esquema `controlelectoral://` abre las pantallas `app/correo-verificado.tsx` y `app/restablecer-clave.tsx`. Si la *Redirect URL* está mal, el enlace termina en el navegador; pasó en Expo Go el 23/11 con `exp://`, registrado en `CONTEXTO_PROYECTO.md`. Antes de entregar hay que quitar el secreto `PERMITIR_EXPO_GO` y la URL `exp://` del panel.
+- **Limitaciones:** el correo puede llegar a spam, el SMTP gratuito tiene cuotas y sin internet no se envían correos.
 
-## 4. Justificación
+## Verificación
+- **Manual:** el estudiante comprobó la recuperación por enlace y la llegada del correo SMTP (Gmail) **en el APK**. No hay registro adjunto.
+- **Automática:** no hay pruebas automáticas de este flujo.
+- **Pendiente:**
+  - un enlace vencido o ya usado debe rechazarse;
+  - un correo no verificado o inexistente debe recibir la misma respuesta genérica.
 
-- Los enlaces únicos y con expiración vienen **resueltos por el servicio**: no hay que programar tokens propios.
-- Cumple la condición del enunciado de que cada persona **recupere su acceso sin depender de nadie**.
-- La identidad del remitente y las plantillas en español generan confianza en usuarios con poca experiencia.
+## Uso de IA
+La revisión con IA se hizo el 25/11/2026, después del consenso del 22/11.
+- **ChatGPT** estuvo de acuerdo, condicionado a la configuración. Pidió separar lo que está en el panel de Supabase de lo versionado en el código y probar enlaces vencidos, reutilizados y de correos no verificados o inexistentes. Propuso como alternativa los tokens y correos propios, pero la desaconsejó.
+- **Gemini** la aprobó con alertas operativas. Señaló que en Android el mayor riesgo es que el enlace abierto desde Gmail termine en el navegador y no en la app. Pidió documentar el vencimiento de los enlaces y las cuotas del SMTP.
+- **Claude**, que participó en la redacción de estos ADR (no es un revisor independiente), confirmó en `solicitar-recuperacion` la respuesta genérica y el tiempo constante. También recordó que el problema de redirección de Gemini ya ocurrió en Expo Go.
 
-## 5. Consecuencias
-
-**Positivas**
-- Flujo de verificación y recuperación probado, sin código propio de tokens.
-- La sesión del coordinador **no se interrumpe** al crear cuentas, porque la creación ocurre en el servidor.
-- El flujo es fácil de explicar en la sustentación.
-
-**Negativas**
-- Requiere más código y, por tanto, más pruebas.
-- El enlace puede fallar si el esquema del simulador (Expo Go) no es el mismo que el del APK.
-- El correo puede caer en **SPAM**.
-- Los correos **no se envían sin conexión**.
-
-## 6. Relación con el examen
-
-- **Rúbrica:** «Acceso de los usuarios» (1,6 pts).
-- **Enunciado:** «necesitamos tener la certeza de que [el correo] es real y de que le pertenece» y «que cada persona pueda recuperar su acceso sin depender de nadie».
-
-## 7. Evidencia de implementación
-
-| Qué | Dónde |
-|---|---|
-| Alta y envío del enlace de verificación | `supabase/functions/crear-usuario` (crea la cuenta y **al final** invita; ver `ADR-C02` §2) |
-| Recuperación solo para correos verificados, con respuesta genérica | `supabase/functions/solicitar-recuperacion` + RPC `public.correo_verificado` |
-| Pantallas | `app/correo-verificado.tsx`, `app/recuperar-clave.tsx`, `app/restablecer-clave.tsx` |
-| Esquema del enlace | `controlelectoral://` en el APK; `exp://` solo en pruebas con `PERMITIR_EXPO_GO` |
-
-**Diferencias y pendientes respecto de lo acordado**
-- **SMTP personalizado:** se configura en el panel de Supabase, no en el código. No hay registro en el repositorio de que esté configurado; debe comprobarse antes de la entrega.
-- **Aclaración aceptada:** la línea base anterior usaba un código OTP; se cambió a **enlace** para cumplir este ADR (`ADR_LINEA_BASE.md` §4.8).
-- La consecuencia negativa sobre el esquema del simulador se confirmó en las pruebas: fue necesario registrar la URL `exp://…` en Supabase (`CONTEXTO_PROYECTO.md`, 23/11).
+Las tres coincidieron con la decisión.
+- **Se aceptaron:** separar la configuración del código y el riesgo de los enlaces en Android, ambos en «Consecuencias», y las pruebas de enlaces vencidos o reutilizados, como pendiente.
+- **Se descartó:** la alternativa de tokens propios, que ninguna recomendó.
