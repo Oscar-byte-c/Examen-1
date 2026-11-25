@@ -17,6 +17,10 @@ export const typography = {
   label: { fontSize: 16, lineHeight: 22, fontWeight: '600' },
   button: { fontSize: 18, lineHeight: 24, fontWeight: '700' },
   caption: { fontSize: 14, lineHeight: 20, fontWeight: '500' },
+  /** Cifras y conteos: dígitos de ancho fijo para que los números no «bailen» al cambiar. */
+  numeral: { fontSize: 32, lineHeight: 38, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  /** Números dentro de texto o filas (votos, sumas): mismo tamaño que el cuerpo, ancho fijo. */
+  numeralSmall: { fontSize: 18, lineHeight: 26, fontWeight: '700', fontVariant: ['tabular-nums'] },
 } as const satisfies Record<string, TextStyle>;
 
 export type TypographyVariant = keyof typeof typography;

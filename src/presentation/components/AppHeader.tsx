@@ -17,59 +17,64 @@ export type HeaderAction = {
 export type AppHeaderProps = {
   title: string;
   subtitle?: string;
-  /** Texto pequeño sobre el título (p. ej. el rol del usuario). */
+  /** Rol del usuario: se muestra como una etiqueta discreta sobre el título. */
   eyebrow?: string;
   icon?: IconName;
   action?: HeaderAction;
 };
 
 /**
- * Encabezado institucional de las pantallas principales: banda de color primario,
- * rol del usuario, título y una acción visible con texto (no solo ícono).
- * Respeta el área segura superior (Android edge-to-edge).
+ * Encabezado institucional «Acta y sello» de las pantallas de inicio: compacto, fondo tinta y
+ * una franja ocre de sello. El rol va como etiqueta en tipografía normal (sin mayúsculas
+ * forzadas). Ningún texto se corta: un nombre largo ocupa más líneas. La acción («Salir»)
+ * conserva su texto visible y un área táctil ≥ 48 dp. Respeta el área segura superior.
  */
 export function AppHeader({ title, subtitle, eyebrow, icon, action }: AppHeaderProps) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + spacing.md }]} accessibilityRole="header">
+    <View accessibilityRole="header">
       <StatusBar style="light" />
-      <View style={styles.row}>
-        {icon ? (
-          <View style={styles.iconWrap}>
-            <AppIcon name={icon} size={sizes.iconLg} color="onPrimary" />
-          </View>
-        ) : null}
-
-        <View style={styles.texts}>
-          {eyebrow ? (
-            <AppText variant="caption" color="onPrimary" style={styles.eyebrow}>
-              {eyebrow.toUpperCase()}
-            </AppText>
+      <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
+        <View style={styles.row}>
+          {icon ? (
+            <View style={styles.iconWrap}>
+              <AppIcon name={icon} size={sizes.iconMd} color="onPrimary" />
+            </View>
           ) : null}
-          <AppText variant="title" color="onPrimary" numberOfLines={2}>
-            {title}
-          </AppText>
-          {subtitle ? (
-            <AppText variant="bodySmall" color="onPrimary" style={styles.subtitle}>
-              {subtitle}
+          <View style={styles.texts}>
+            {eyebrow ? (
+              <View style={styles.chip}>
+                <AppText variant="caption" color="onPrimary">
+                  {eyebrow}
+                </AppText>
+              </View>
+            ) : null}
+            <AppText variant="title" color="onPrimary">
+              {title}
             </AppText>
+            {subtitle ? (
+              <AppText variant="bodySmall" color="onPrimary" style={styles.subtitle}>
+                {subtitle}
+              </AppText>
+            ) : null}
+          </View>
+          {action ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={action.label}
+              onPress={action.onPress}
+              hitSlop={spacing.xxs}
+              style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}>
+              <AppIcon name={action.icon} color="onPrimary" />
+              <AppText variant="caption" color="onPrimary">
+                {action.label}
+              </AppText>
+            </Pressable>
           ) : null}
         </View>
-
-        {action ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={action.label}
-            onPress={action.onPress}
-            style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}>
-            <AppIcon name={action.icon} color="onPrimary" />
-            <AppText variant="caption" color="onPrimary">
-              {action.label}
-            </AppText>
-          </Pressable>
-        ) : null}
       </View>
+      <View style={styles.franja} />
     </View>
   );
 }
@@ -78,31 +83,38 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.md,
-    paddingBottom: spacing.lg,
-    borderBottomLeftRadius: radius.xl,
-    borderBottomRightRadius: radius.xl,
+    paddingBottom: spacing.md,
   },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   iconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.lg,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    width: sizes.touchMin - spacing.xs,
+    height: sizes.touchMin - spacing.xs,
+    marginTop: spacing.xxs,
+    borderRadius: radius.md,
+    backgroundColor: colors.onPrimaryVeil,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  texts: { flex: 1, gap: 2 },
-  eyebrow: { letterSpacing: 1, opacity: 0.9 },
+  texts: { flex: 1, minWidth: 0, gap: spacing.xxs },
+  chip: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    backgroundColor: colors.onPrimaryVeil,
+  },
   subtitle: { opacity: 0.92 },
   action: {
-    minWidth: 64,
-    minHeight: 56,
+    minWidth: sizes.touchMin + spacing.sm,
+    minHeight: sizes.touchMin + spacing.xs,
     paddingHorizontal: spacing.xs,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: colors.onPrimaryVeil,
   },
-  actionPressed: { backgroundColor: 'rgba(255,255,255,0.28)' },
+  actionPressed: { backgroundColor: colors.onPrimaryVeilPressed },
+  /** Franja ocre del «sello»: decorativa, no transmite información. */
+  franja: { height: sizes.franja, backgroundColor: colors.accent },
 });

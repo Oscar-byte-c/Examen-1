@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { StyleSheet, View } from 'react-native';
 
+import { CredencialesInvalidasError } from '@/domain/entities/errores';
 import { loginSchema } from '@/domain/entities/Usuario';
 import { AppButton, AppIcon, AppText, CampoTexto, Retroalimentacion } from '@/presentation/components';
 import { PantallaAuth } from '@/presentation/components/PantallaAuth';
@@ -13,15 +14,23 @@ import { sizes, spacing } from '@/presentation/theme';
 
 type Entrada = { correo: string; clave: string };
 
+/** Mensaje cuando el servidor rechaza las credenciales. Supabase no distingue si falló el correo
+ *  o la clave (para no revelar qué correos tienen cuenta), así que no se afirma cuál de los dos. */
+const CREDENCIALES_INCORRECTAS = 'El correo o la clave son incorrectos.';
+
 /**
  * Inicio de sesión (RF-01). React Hook Form + esquema Zod del dominio (ADR-08/09):
  * los errores de formato se muestran en el campo SIN llamar a la red.
  * No existe registro público ni selector de rol: el rol lo decide el servidor.
+ * Si el servidor rechaza las credenciales, el campo de clave se sacude (Reanimated) y muestra
+ * el mensaje debajo. Errores de red, límite de intentos, cuenta inactiva, etc. NO lo sacuden.
  */
 export default function LoginScreen() {
   const iniciarSesion = useAuthStore((s) => s.iniciarSesion);
+  const avisoLogin = useAuthStore((s) => s.avisoLogin);
   const [error, setError] = useState<string | null>(null);
-  const { control, handleSubmit, formState } = useForm<Entrada>({
+  const [sacudidas, setSacudidas] = useState(0);
+  const { control, handleSubmit, formState, setError: marcarCampo } = useForm<Entrada>({
     resolver: zodResolver(loginSchema),
     defaultValues: { correo: '', clave: '' },
   });
@@ -31,7 +40,12 @@ export default function LoginScreen() {
     try {
       await iniciarSesion(correo, clave); // los guards llevan al panel del rol
     } catch (e) {
-      setError(mensajeDeError(e));
+      if (e instanceof CredencialesInvalidasError) {
+        marcarCampo('clave', { type: 'server', message: CREDENCIALES_INCORRECTAS });
+        setSacudidas((n) => n + 1);
+      } else {
+        setError(mensajeDeError(e));
+      }
     }
   });
 
@@ -56,8 +70,18 @@ export default function LoginScreen() {
         autoCapitalize="none"
         autoComplete="email"
       />
-      <CampoTexto control={control} name="clave" label="Clave" icon="lock" placeholder="Tu clave" isPassword autoCapitalize="none" />
+      <CampoTexto
+        control={control}
+        name="clave"
+        label="Clave"
+        icon="lock"
+        placeholder="Tu clave"
+        isPassword
+        autoCapitalize="none"
+        sacudir={sacudidas}
+      />
 
+      {avisoLogin && !error ? <Retroalimentacion tipo="exito" titulo="Clave actualizada" mensaje={avisoLogin} /> : null}
       {formState.isSubmitting ? <Retroalimentacion tipo="proceso" titulo="Verificando tus datos…" /> : null}
       {error ? <Retroalimentacion tipo="error" titulo="No pudimos ingresar" mensaje={error} /> : null}
 

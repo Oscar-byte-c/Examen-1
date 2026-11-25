@@ -3,10 +3,10 @@ import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors, radius, sizes, spacing } from '@/presentation/theme';
+import { colors, sizes, spacing } from '@/presentation/theme';
 
+import { AnimacionLottie } from './AnimacionLottie';
 import { AppCard } from './AppCard';
-import { AppIcon } from './AppIcon';
 import { AppText } from './AppText';
 
 /** Estructura común de las pantallas de acceso (login, recuperación, cambio de clave). */
@@ -20,9 +20,8 @@ export function PantallaAuth({ titulo, children, pie }: { titulo: string; childr
         keyboardShouldPersistTaps="handled">
         <View style={styles.inner}>
           <View style={styles.brand}>
-            <View style={styles.logo}>
-              <AppIcon name="how_to_vote" size={44} color="onPrimary" />
-            </View>
+            {/* Emblema «Acta y sello» (Lottie, una vez al entrar). Decorativo: el nombre lo dice el texto. */}
+            <AnimacionLottie nombre="emblemaLogin" tamano={sizes.lottieLg} />
             <AppText variant="display" align="center" color="primary">
               Control Electoral
             </AppText>
@@ -48,14 +47,5 @@ const styles = StyleSheet.create({
   content: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: spacing.md },
   inner: { width: '100%', maxWidth: sizes.maxContentWidth, alignSelf: 'center', gap: spacing.lg },
   brand: { alignItems: 'center', gap: spacing.xs },
-  logo: {
-    width: 84,
-    height: 84,
-    borderRadius: radius.xl,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xs,
-  },
   form: { gap: spacing.md },
 });

@@ -1,4 +1,5 @@
 import { ActivityIndicator, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { colors, radius, sizes, spacing, type ColorToken } from '@/presentation/theme';
 
@@ -19,6 +20,7 @@ export type AppButtonProps = {
   disabled?: boolean;
   fullWidth?: boolean;
   accessibilityHint?: string;
+  /** Estilo de colocación (p. ej. `flex: 1` en una fila de botones). */
   style?: StyleProp<ViewStyle>;
 };
 
@@ -34,9 +36,15 @@ const VARIANTS: Record<ButtonVariant, VariantStyle> = {
 
 const resolve = (token: ColorToken | 'transparent') => (token === 'transparent' ? 'transparent' : colors[token]);
 
+/** Respuesta al dedo: se encoge al presionar y vuelve al soltar (skill expo-animation). */
+const PRESION = { escala: 0.97, entradaMs: 100, salidaMs: 150 };
+
 /**
  * Botón principal de la app. Grande (52–60 dp), con texto claro, ícono opcional
  * y estado de carga integrado para que el usuario sepa que la acción está en proceso.
+ *  - La etiqueta NUNCA se corta: si no cabe, el botón crece en alto (RNF-07, fuente grande).
+ *  - Reanimated escala el botón en el hilo de la interfaz al presionar; con «reducir
+ *    movimiento» no se anima (queda el cambio de color).
  */
 export function AppButton({
   label,
@@ -54,51 +62,61 @@ export function AppButton({
   const v = VARIANTS[variant];
   const isDisabled = disabled || loading;
   const fg: ColorToken = isDisabled ? 'disabledText' : v.fg;
+  const reducirMovimiento = useReducedMotion();
+  const escala = useSharedValue(1);
+  const estiloEscala = useAnimatedStyle(() => ({ transform: [{ scale: escala.get() }] }));
 
   const iconNode = icon ? <AppIcon name={icon} size={sizes.iconMd} color={fg} /> : null;
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityHint={accessibilityHint}
-      accessibilityState={{ disabled: isDisabled, busy: loading }}
-      disabled={isDisabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.base,
-        { minHeight: size === 'lg' ? sizes.buttonLg : sizes.buttonMd },
-        fullWidth && styles.fullWidth,
-        {
-          backgroundColor: isDisabled && variant !== 'ghost' ? colors.disabledBackground : resolve(pressed ? v.bgPressed : v.bg),
-          borderColor: v.border ? (isDisabled ? colors.border : colors[v.border]) : 'transparent',
-        },
-        style,
-      ]}>
-      {loading ? (
-        <ActivityIndicator color={colors[fg]} />
-      ) : (
-        <View style={styles.content}>
-          {iconPosition === 'left' && iconNode}
-          <AppText variant="button" color={fg} numberOfLines={2} align="center">
-            {label}
-          </AppText>
-          {iconPosition === 'right' && iconNode}
-        </View>
-      )}
-    </Pressable>
+    <Animated.View style={[fullWidth && styles.fullWidth, estiloEscala, style]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityHint={accessibilityHint}
+        accessibilityState={{ disabled: isDisabled, busy: loading }}
+        disabled={isDisabled}
+        onPress={onPress}
+        onPressIn={() => {
+          if (!reducirMovimiento) escala.set(withTiming(PRESION.escala, { duration: PRESION.entradaMs }));
+        }}
+        onPressOut={() => escala.set(withTiming(1, { duration: PRESION.salidaMs }))}
+        pressRetentionOffset={spacing.md}
+        style={({ pressed }) => [
+          styles.base,
+          { minHeight: size === 'lg' ? sizes.buttonLg : sizes.buttonMd },
+          {
+            backgroundColor: isDisabled && variant !== 'ghost' ? colors.disabledBackground : resolve(pressed ? v.bgPressed : v.bg),
+            borderColor: v.border ? (isDisabled ? colors.border : colors[v.border]) : 'transparent',
+          },
+        ]}>
+        {loading ? (
+          <ActivityIndicator color={colors[fg]} />
+        ) : (
+          <View style={styles.content}>
+            {iconPosition === 'left' && iconNode}
+            <AppText variant="button" color={fg} align="center" style={styles.label}>
+              {label}
+            </AppText>
+            {iconPosition === 'right' && iconNode}
+          </View>
+        )}
+      </Pressable>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   base: {
+    flexGrow: 1,
     borderRadius: radius.md,
     borderWidth: 2,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     alignItems: 'center',
     justifyContent: 'center',
   },
   fullWidth: { alignSelf: 'stretch' },
-  content: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  content: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, maxWidth: '100%' },
+  label: { flexShrink: 1 },
 });

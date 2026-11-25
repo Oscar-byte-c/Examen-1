@@ -37,7 +37,7 @@ export function StatusBadge({ status, label }: StatusBadgeProps) {
   return (
     <View style={[styles.badge, { backgroundColor: colors[s.bg] }]} accessibilityRole="text" accessibilityLabel={`Estado: ${text}`}>
       <AppIcon name={s.icon} size={sizes.iconSm - 2} color={s.fg} />
-      <AppText variant="caption" color={s.fg}>
+      <AppText variant="caption" color={s.fg} style={styles.text}>
         {text}
       </AppText>
     </View>
@@ -53,5 +53,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xs,
     paddingVertical: spacing.xxs,
     borderRadius: radius.pill,
+    maxWidth: '100%',
   },
+  // Un texto largo pasa a otra línea dentro de la insignia en vez de salirse.
+  text: { flexShrink: 1 },
 });

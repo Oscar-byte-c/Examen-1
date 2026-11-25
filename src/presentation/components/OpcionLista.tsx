@@ -23,15 +23,17 @@ export function OpcionLista({ titulo, detalle, icono = 'chevron_right', seleccio
       accessibilityLabel={detalle ? `${titulo}. ${detalle}` : titulo}
       accessibilityState={{ selected: seleccionada }}
       style={({ pressed }) => [styles.fila, seleccionada && styles.seleccionada, pressed && styles.presionada]}>
-      <View style={styles.textos}>
-        <AppText variant="bodyStrong">{titulo}</AppText>
-        {detalle ? (
-          <AppText variant="bodySmall" color="textSecondary">
-            {detalle}
-          </AppText>
-        ) : null}
+      <View style={styles.principal}>
+        <View style={styles.textos}>
+          <AppText variant="bodyStrong">{titulo}</AppText>
+          {detalle ? (
+            <AppText variant="bodySmall" color="textSecondary">
+              {detalle}
+            </AppText>
+          ) : null}
+        </View>
+        {accesorio ? <View style={styles.accesorio}>{accesorio}</View> : null}
       </View>
-      {accesorio}
       <AppIcon name={seleccionada ? 'check_circle' : icono} color={seleccionada ? 'success' : 'textSecondary'} />
     </Pressable>
   );
@@ -52,5 +54,8 @@ const styles = StyleSheet.create({
   },
   seleccionada: { borderColor: colors.success, backgroundColor: colors.successSoft },
   presionada: { backgroundColor: colors.primarySoft },
-  textos: { flex: 1, gap: 2 },
+  // Título y accesorio comparten fila si caben; si no, el accesorio baja (sin cortar el título).
+  principal: { flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.sm, rowGap: spacing.xs },
+  textos: { flexGrow: 1, flexShrink: 1, flexBasis: 140, minWidth: 0, gap: 2 },
+  accesorio: { flexShrink: 1, maxWidth: '100%' },
 });

@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { StyleSheet, View } from 'react-native';
 
@@ -16,6 +16,8 @@ import {
   type FormularioActaEntrada,
   type FormularioActaSalida,
 } from '@/domain/entities/Acta';
+import { evaluarUbicacionEvidencia } from '@/domain/entities/geo';
+import type { Recinto } from '@/domain/entities/Territorio';
 import type { EvidenciaAnalizada } from '@/domain/use-cases/actas';
 import { container } from '@/data/di/container';
 import {
@@ -27,11 +29,15 @@ import {
   LoadingIndicator,
   Retroalimentacion,
   ScreenContainer,
+  PasosActa,
+  SelloEstado,
   StatusBadge,
+  UbicacionEvidencia,
 } from '@/presentation/components';
 import { CamaraActa } from '@/presentation/components/CamaraActa';
-import { mensajeDeError, useActa, useCandidatos } from '@/presentation/hooks/consultas';
-import { ESTADO_ENVIO_BADGE } from '@/presentation/screens/actas/etiquetas';
+import { mensajeDeError, useActa, useCandidatos, useFotoEvidencia, useRecintoDeMesa } from '@/presentation/hooks/consultas';
+import { useSession } from '@/presentation/navigation/useSession';
+import { SELLO_ESTADO_ENVIO } from '@/presentation/screens/actas/etiquetas';
 import { useSyncStore } from '@/presentation/store/syncStore';
 import { colors, radius, spacing } from '@/presentation/theme';
 
@@ -77,7 +83,8 @@ function valoresIniciales(candidatos: Candidato[], a: Acta | null): FormularioAc
   };
 }
 
-const ESTADO_BADGE = ESTADO_ENVIO_BADGE;
+/** Pasos del registro (RF-09 a RF-11): una secuencia real, por eso van numerados. */
+const PASOS = ['Resultados', 'Foto', 'Guardar'] as const;
 
 function FormularioActa(props: {
   titulo: string;
@@ -88,6 +95,14 @@ function FormularioActa(props: {
 }) {
   const { titulo, mesaId, dignidad, candidatos, existente } = props;
   const sincronizar = useSyncStore((s) => s.sincronizar);
+  const conectado = useSyncStore((s) => s.conectado);
+  const { usuario } = useSession();
+  // S-06: coordenadas del recinto para comparar con el lugar de la foto (caché del veedor sin red).
+  const recinto = useRecintoDeMesa(mesaId, usuario?.rol ?? null, usuario?.recintoId ?? null);
+
+  // ADR-04 / RF-12: el GPS se enciende al abrir la pantalla y se apaga al salir. Sin internet el
+  // primer fix tarda; así ya hay señal al tomar la foto. Solo cuentan lecturas POSTERIORES a la foto.
+  useEffect(() => container.prepararUbicacion.execute(), []);
   // Id estable del acta (idempotencia, ADR-03/10): el inicializador perezoso corre una sola vez.
   const [actaId] = useState(() => existente?.id ?? container.nuevoId());
   const schema = useMemo(() => crearFormularioActaSchema(candidatos.map((c) => c.id)), [candidatos]);
@@ -129,7 +144,8 @@ function FormularioActa(props: {
         mesaId,
         dignidad,
         resultados: aResultados(d),
-        evidencia: evidencia?.legible ? evidencia : null,
+        // Se pasa tal cual: si no es legible, el caso de uso la rechaza (FotoIlegibleError).
+        evidencia,
         versionBase: existente?.versionBase ?? 0,
         candidatosEsperados: candidatos.length,
       });
@@ -142,20 +158,46 @@ function FormularioActa(props: {
 
   if (camaraAbierta) return <CamaraActa onCaptura={alCapturar} onCancelar={() => setCamaraAbierta(false)} />;
 
+  // Pasos (solo presentación): se calculan con el estado que ya existe en el formulario.
+  const completos = [formState.isValid, !!evidencia?.legible, !!resultado?.ok];
+  const actual = Math.max(0, completos.indexOf(false));
+
+  // Pie fijo: la suma queda a la vista JUNTO al botón Guardar (RF-10 / RF-19).
+  const pie = resultado?.ok ? (
+    <AppButton label="Volver a mis mesas" icon="arrow_back" variant="outline" onPress={() => router.back()} />
+  ) : (
+    <>
+      <View style={styles.suma} accessible accessibilityLiveRegion="polite"
+        accessibilityLabel={`Válidos ${suma.validos} más blancos ${suma.blancos} más nulos ${suma.nulos} igual ${suma.total}. ${suma.cuadra ? 'La suma cuadra' : 'Revisa la suma'}`}>
+        <AppText variant="bodySmall" style={styles.sumaTexto}>
+          Válidos {suma.validos} + blancos {suma.blancos} + nulos {suma.nulos} ={' '}
+          <AppText variant="numeralSmall">{suma.total}</AppText>
+        </AppText>
+        <StatusBadge status={suma.cuadra ? 'success' : 'warning'} label={suma.cuadra ? 'La suma cuadra' : 'Revisa la suma'} />
+      </View>
+      <AppButton
+        label="Guardar acta"
+        icon="save"
+        size="lg"
+        onPress={guardar}
+        loading={formState.isSubmitting}
+        disabled={formState.isSubmitting || analizando || !evidencia?.legible}
+        accessibilityHint="Se habilita cuando la foto es legible"
+      />
+    </>
+  );
+
   return (
-    <ScreenContainer>
+    <ScreenContainer pie={pie}>
       <Stack.Screen options={{ title: titulo }} />
+      <PasosActa pasos={PASOS} actual={actual} completos={completos} />
       <BarraConexion />
       {existente ? (
-        <View style={styles.fila}>
-          <AppText variant="bodySmall" color="textSecondary">
-            Estás corrigiendo un acta ya registrada.
-          </AppText>
-          <StatusBadge status={ESTADO_BADGE[existente.estado].status} label={ESTADO_BADGE[existente.estado].label} />
-        </View>
+        <SelloEstado {...SELLO_ESTADO_ENVIO[existente.estado]} detalle="Estás corrigiendo un acta ya registrada." />
       ) : null}
+      {existente ? <EvidenciaRegistrada acta={existente} recinto={recinto} conectado={conectado} /> : null}
 
-      <AppCard title="1. Resultados" subtitle="Copia los números tal como están en el acta." icon="edit_note">
+      <AppCard title="Resultados" subtitle="Copia los números tal como están en el acta." icon="edit_note">
         <View style={styles.campos}>
           <CampoTexto control={control} name="totalSufragantes" label="Total de sufragantes" keyboardType="number-pad" />
           {candidatos.map((c) => (
@@ -170,34 +212,43 @@ function FormularioActa(props: {
           ))}
           <CampoTexto control={control} name="votosBlancos" label="Votos en blanco" keyboardType="number-pad" />
           <CampoTexto control={control} name="votosNulos" label="Votos nulos" keyboardType="number-pad" />
-          <View style={styles.resumen} accessibilityLiveRegion="polite">
-            <AppText variant="bodySmall">
-              Válidos {suma.validos} + blancos {suma.blancos} + nulos {suma.nulos} ={' '}
-              <AppText variant="bodyStrong">{suma.total}</AppText>
-            </AppText>
-            <StatusBadge status={suma.cuadra ? 'success' : 'warning'} label={suma.cuadra ? 'La suma cuadra' : 'Revisa la suma'} />
-          </View>
         </View>
       </AppCard>
 
-      <AppCard title="2. Foto del acta" subtitle="Se guarda con la ubicación del momento." icon="photo_camera">
+      <AppCard title="Foto del acta" subtitle="Se guarda con la ubicación del momento." icon="photo_camera">
         <View style={styles.campos}>
-          {analizando ? <Retroalimentacion tipo="proceso" titulo="Revisando la foto y tu ubicación…" /> : null}
+          {analizando ? (
+            <Retroalimentacion
+              tipo="proceso"
+              animacion="gpsBuscando"
+              titulo="Revisando la foto y buscando señal GPS…"
+              mensaje={conectado ? undefined : 'Sin internet el GPS puede tardar hasta un minuto. Mantén el celular quieto, cerca de una ventana o al aire libre.'}
+            />
+          ) : null}
           {errorEvidencia ? <Retroalimentacion tipo="error" titulo="No se pudo usar la foto" mensaje={errorEvidencia} /> : null}
           {evidencia ? (
             <>
               <Image source={{ uri: evidencia.fotoUri }} style={styles.foto} contentFit="contain" accessibilityLabel="Vista previa de la foto del acta" />
               {evidencia.legible ? (
-                <Retroalimentacion
-                  tipo="exito"
-                  titulo="La foto se ve legible"
-                  mensaje={`Ubicación registrada (precisión ±${Math.round(evidencia.ubicacion.precisionM)} m).`}
-                />
+                <>
+                  <Retroalimentacion
+                    tipo="exito"
+                    animacion="gpsUbicado"
+                    titulo="Foto legible y ubicación registrada"
+                    mensaje="Abajo ves dónde se tomó."
+                  />
+                  {/* RF-12 / S-06: la ubicación leída AL DISPARAR, comparada con el recinto. */}
+                  <UbicacionEvidencia
+                    evaluacion={evaluarUbicacionEvidencia(evidencia.ubicacion, recinto)}
+                    recintoNombre={recinto?.nombre}
+                    conectado={conectado}
+                  />
+                </>
               ) : (
                 <Retroalimentacion
                   tipo="error"
-                  titulo="La foto está borrosa"
-                  mensaje="No se leen bien los números. Tómala otra vez con más luz y el celular quieto."
+                  titulo="La foto está borrosa y no se leen bien los números"
+                  mensaje="Tómala otra vez con más luz y el celular quieto. No podrás guardar hasta que sea legible."
                 />
               )}
             </>
@@ -213,29 +264,64 @@ function FormularioActa(props: {
       </AppCard>
 
       {resultado ? (
-        <Retroalimentacion tipo={resultado.ok ? 'exito' : 'error'} titulo={resultado.ok ? 'Acta guardada' : 'No se guardó el acta'} mensaje={resultado.mensaje} />
-      ) : null}
-      {resultado?.ok ? (
-        <AppButton label="Volver a mis mesas" icon="arrow_back" variant="outline" onPress={() => router.back()} />
-      ) : (
-        <AppButton
-          label="3. Guardar acta"
-          icon="save"
-          size="lg"
-          onPress={guardar}
-          loading={formState.isSubmitting}
-          disabled={formState.isSubmitting || analizando || !evidencia?.legible}
-          accessibilityHint="Se habilita cuando la foto es legible"
+        <Retroalimentacion
+          tipo={resultado.ok ? 'exito' : 'error'}
+          animacion={resultado.ok ? 'actaSellada' : undefined}
+          titulo={resultado.ok ? 'Acta guardada' : 'No se guardó el acta'}
+          mensaje={resultado.mensaje}
         />
-      )}
+      ) : null}
     </ScreenContainer>
+  );
+}
+
+/**
+ * RF-12: evidencia ORIGINAL de un acta ya registrada (foto y lugar de captura guardados con ella).
+ * La foto viene del celular o, si el acta solo está en el servidor, de una dirección temporal
+ * autorizada por la RLS de Storage. Nunca se usa la ubicación actual como sustituto.
+ */
+function EvidenciaRegistrada({ acta, recinto, conectado }: { acta: Acta; recinto: Recinto | null; conectado: boolean }) {
+  const foto = useFotoEvidencia(acta);
+  const [fotoFallo, setFotoFallo] = useState(false);
+  const remota = !!foto.data && /^https?:/i.test(foto.data);
+
+  return (
+    <AppCard title="Evidencia registrada" subtitle="Foto y ubicación originales de esta acta." icon="verified">
+      <View style={styles.campos}>
+        {foto.isPending ? (
+          <LoadingIndicator message="Cargando la foto…" />
+        ) : foto.isError || fotoFallo || !foto.data ? (
+          <Retroalimentacion
+            tipo="error"
+            titulo="No se pudo mostrar la foto"
+            mensaje={foto.isError ? mensajeDeError(foto.error) : 'La foto no está disponible en este momento.'}
+          />
+        ) : (
+          <Image
+            source={{ uri: foto.data }}
+            // La dirección del servidor es temporal y privada: no se guarda en la caché de disco.
+            cachePolicy={remota ? 'memory' : 'memory-disk'}
+            style={styles.foto}
+            contentFit="contain"
+            onError={() => setFotoFallo(true)}
+            accessibilityLabel="Foto original del acta"
+          />
+        )}
+        <UbicacionEvidencia
+          evaluacion={evaluarUbicacionEvidencia(acta.ubicacion, recinto, acta.evidenciaServidor)}
+          recintoNombre={recinto?.nombre}
+          conectado={conectado}
+        />
+      </View>
+    </AppCard>
   );
 }
 
 const styles = StyleSheet.create({
   campos: { gap: spacing.md },
-  fila: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   candidato: { borderLeftWidth: 6, paddingLeft: spacing.sm, borderRadius: radius.sm },
-  resumen: { gap: spacing.xs, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.surfaceMuted },
+  // La suma y su estado comparten fila si caben; si no (pantalla angosta o fuente grande), la insignia baja.
+  suma: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: spacing.sm, rowGap: spacing.xxs },
+  sumaTexto: { flexGrow: 1, flexShrink: 1, flexBasis: 200, minWidth: 0 },
   foto: { width: '100%', aspectRatio: 3 / 4, borderRadius: radius.md, backgroundColor: colors.surfaceMuted },
 });

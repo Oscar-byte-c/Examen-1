@@ -38,10 +38,13 @@ export function EmptyState({ icon = 'inbox', title, description, actionLabel, on
 
 const styles = StyleSheet.create({
   container: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.lg, paddingHorizontal: spacing.md },
+  // Aro de «sello» en tinta: identidad sin decoración extra.
   iconWrap: {
-    width: 88,
-    height: 88,
+    width: sizes.lottieMd + spacing.xs,
+    height: sizes.lottieMd + spacing.xs,
     borderRadius: radius.pill,
+    borderWidth: 2,
+    borderColor: colors.primaryBorder,
     backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',

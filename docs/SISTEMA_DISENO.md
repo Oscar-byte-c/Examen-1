@@ -1,93 +1,94 @@
-# Sistema de diseño – Control Electoral
+# Sistema de diseño – Control Electoral («Acta y sello»)
 
-**Fase:** 2 – Diseño visual base. **Ubicación:** `src/presentation/theme` y `src/presentation/components`.
+**Fase 4, primera etapa (24/11).** Ubicación: `src/presentation/theme` y `src/presentation/components`.
 
-Principios: **institucional, sobrio y accesible**. Pensado para usuarios adultos mayores o con poca experiencia: textos grandes, botones amplios, etiquetas siempre visibles, y estados que combinan color, ícono y texto. Sin animaciones decorativas.
+Concepto: la app es una **acta oficial**. Tinta para la autoridad del documento, **ocre de sello** como único acento y fondos de papel. El elemento distintivo es el **sello de estado**; todo lo demás es sobrio. Pensado para personas mayores o con poca experiencia (RNF-07): textos grandes, botones de 52–60 dp, etiquetas siempre visibles y estados que combinan color, ícono y texto. Sin degradados, sin mayúsculas forzadas y sin animaciones decorativas.
 
 ---
 
 ## 1. Tokens (`src/presentation/theme`)
 
-Se importan siempre desde `@/presentation/theme`. Ningún componente usa valores hexadecimales directos.
+Siempre se importan desde `@/presentation/theme`. Ningún componente usa valores hexadecimales directos.
 
-### Colores (`colors.ts`), paleta PROVISIONAL
+### Colores (`colors.ts`), paleta PROVISIONAL (RNF-06)
 
 | Rol | Token | Valor | Uso |
 |---|---|---|---|
-| Primario | `primary` / `primaryPressed` / `primarySoft` | #1E3A8A / #102A54 / #EEF2FF | Marca, botones principales, encabezados |
-| Secundario | `secondary` | #0F766E | Acciones secundarias, acentos |
-| Fondo | `background` / `surface` / `surfaceMuted` | #F5F7FA / #FFFFFF / #F3F4F6 | Pantalla, tarjetas, campos deshabilitados |
-| Texto | `text` / `textSecondary` / `textMuted` | #111827 / #4B5563 / #6B7280 | Jerarquía de texto |
-| Bordes | `border` / `divider` | #D1D5DB / #E5E7EB | Campos, tarjetas |
-| Éxito | `success` / `successSoft` | #15803D / #DCFCE7 | Guardado, enviado |
-| Advertencia | `warning` / `warningSoft` | #B45309 / #FEF3C7 | Pendiente, atención (p. ej. alerta de 300 m) |
-| Error | `error` / `errorSoft` | #B91C1C / #FEE2E2 | Fallos, validaciones |
-| Información | `info` / `infoSoft` | #1D4ED8 / #DBEAFE | En proceso, avisos |
+| Tinta | `primary` / `primaryPressed` / `primarySoft` | #1B2A57 / #111B3D / #E8EBF4 | Encabezados, botón principal, paso completo |
+| Tinta media | `secondary` | #34446F | Acción secundaria (p. ej. «Cancelar» en la cámara) |
+| Ocre de sello | `accent` / `accentSoft` | #8C5A0B / #F5EBDA | **Escaso**: franja del encabezado, paso en curso, sello «Guardada» |
+| Papel | `background` / `surface` / `surfaceMuted` | #F2F4F7 / #FFFFFF / #E8ECF2 | Fondo, hojas, campos de datos |
+| Texto | `text` / `textSecondary` / `textMuted` | #1C2333 / #4A5468 / #5D677A | Jerarquía de texto |
+| Bordes | `border` / `borderStrong` / `divider` | #D3D9E2 / #7C8597 / #E3E7ED | Hojas, campos, separadores |
+| Estados | `success` · `warning` · `error` · `info` (+ `*Soft`) | #15803D · #B45309 · #B91C1C · #1D4ED8 | Enviado, pendiente/alerta, fallo, en proceso |
 
-**Contraste WCAG 2.1, calculado:** todas las combinaciones de texto cumplen AA (≥ 4.5:1). Por ejemplo, texto sobre superficie 17.7:1, blanco sobre primario 10.4:1, y los estados sobre su fondo suave entre 4.5 y 5.5:1.
-**Para aplicar los colores oficiales** de la organización basta con editar el objeto `palette` en `colors.ts` y volver a verificar el contraste.
+**Contraste WCAG 2.1, calculado** (script en la sesión del 24/11): todo texto ≥ 4.5:1. Por ejemplo, texto/superficie 15.7, blanco/tinta 13.9, ocre/superficie 5.9 y estados sobre su fondo suave 4.5–5.5. Borde fuerte/superficie 3.7 (≥ 3:1 para la UI). **El ocre no se usa como texto sobre la tinta (2.4)**: ahí solo es la franja decorativa.
+Para aplicar los colores oficiales se edita `palette` en `colors.ts`, se recalcula el contraste y se regeneran las animaciones (ver §4).
 
 ### Tipografía (`typography.ts`)
 
-Fuente del sistema (Roboto en Android). Tamaño mínimo 14; el cuerpo de texto usa 18.
+Roboto del sistema (sin fuentes descargadas). Tamaño mínimo 14, cuerpo 18. Variantes: `display 30` · `title 24` · `subtitle 20` · `body/bodyStrong 18` · `bodySmall/label 16` · `button 18` · `caption 14` · **`numeral 32`** y **`numeralSmall 18`** (cifras con `tabular-nums`: los números no «bailan» al cambiar).
+El escalado de fuente del sistema se respeta hasta ×1.4 (`MAX_FONT_SCALE`). Única excepción: las etiquetas de `PasosActa` (×1.2), cada una con un tercio del ancho.
 
-| Variante | Tamaño / peso | Uso |
-|---|---|---|
-| `display` | 30 / 700 | Marca en el login |
-| `title` | 24 / 700 | Título de pantalla |
-| `subtitle` | 20 / 600 | Título de tarjeta |
-| `body` / `bodyStrong` | 18 / 400–600 | Texto general, campos |
-| `bodySmall` | 16 / 400 | Descripciones |
-| `label` | 16 / 600 | Etiquetas de campos y secciones |
-| `button` | 18 / 700 | Botones |
-| `caption` | 14 / 500 | Insignias, ayudas |
+### Espaciado y tamaños (`layout.ts`)
 
-El escalado de fuente del sistema se respeta hasta ×1.4 (`MAX_FONT_SCALE`) para no romper la maquetación.
-
-### Espaciado, radios y tamaños (`layout.ts`)
-
-- **Espaciado** en múltiplos de 4: `xxs 4 · xs 8 · sm 12 · md 16 · lg 24 · xl 32 · xxl 48`.
-- **Radios:** `sm 8 · md 12` (botones, campos) · `lg 16` (tarjetas) · `xl 24` (encabezado) · `pill` (insignias).
-- **Tamaños táctiles:** mínimo 48 dp; botones de 52 dp (`md`) o 60 dp (`lg`); campos de 56 dp.
-- **Sombras:** `card` y `raised`, sutiles (elevación 2–4 en Android).
+Espaciado en múltiplos de 4 (`xxs 4` … `xxl 48`). Radios `sm 8 · md 12 · lg 16 · xl 24 · pill`. Táctil mínimo 48 dp, botones 52/60 dp, campos 56 dp. Tamaños de `sello 52` y de Lottie `40 / 72 / 112`. Sombra `card`: una sola elevación mínima, porque la separación la da el borde fino.
 
 ---
 
 ## 2. Componentes (`src/presentation/components`)
 
-Todos se exportan desde `@/presentation/components`, están tipados y no tienen lógica de negocio.
+| Componente | Propósito |
+|---|---|
+| `AppHeader` | Encabezado compacto en tinta con **franja ocre**; el rol como etiqueta en tipografía normal; título sin cortar; «Salir» con texto |
+| `AppCard` | `variante="tarjeta"` (hoja con borde) o `"seccion"` (título sin caja, para no anidar tarjetas). El elemento de la derecha baja si no cabe |
+| `AppButton` | 52–60 dp; **escala 0.97 al presionar** (Reanimated, hilo de UI); la etiqueta nunca se corta (el botón crece en alto) |
+| `AppInput` / `CampoTexto` | Etiqueta visible, ayuda y error con ícono; **`sacudir`**: sacudida horizontal (Reanimated) cuando el servidor rechaza la clave |
+| `SelloEstado` | **Sello de estado** de doble borde con ícono y texto (Sin registrar · Guardada · Enviando · Enviada · Falló · En revisión) |
+| `PasosActa` | Pasos del acta: Resultados → Foto → Guardar (numerados porque es una secuencia) |
+| `PieFijo` | Barra al pie, fuera del scroll (suma de votos junto a Guardar) |
+| `ScreenContainer` | Fondo, encabezado, scroll, `pie`, **evitar el teclado** (`KeyboardAvoidingView` con la posición real del contenedor) y deslizar para actualizar |
+| `Retroalimentacion` | Resultado o proceso en línea (sin modales), con animación Lottie opcional |
+| `AnimacionLottie` | Reproduce las animaciones del proyecto: decorativas para el lector de pantalla, sin capturar toques, con «reducir movimiento» |
+| `Esqueleto` | Carga de listas con pulso de opacidad (Reanimated); quieto con «reducir movimiento» |
+| `CifraClave` · `BarraProgreso` | Cifras y avance del tablero (preparados para la segunda etapa) |
+| `BarraConexion` | **Único** aviso de conexión y envío, con la animación de sincronización |
+| `EmptyState` · `LoadingIndicator` · `StatusBadge` · `OpcionLista` · `UbicacionEvidencia` · `MapaOSM` · `CamaraActa` | Estados vacíos, carga, insignias, filas, evidencia, mapa y cámara |
 
-| Componente | Propósito | Props clave |
-|---|---|---|
-| `AppButton` | Botón grande con estado de carga | `label`, `variant` (primary · secondary · outline · ghost · danger), `size` (md · lg), `icon`, `loading`, `disabled` |
-| `AppCard` | Tarjeta con encabezado opcional; puede ser pulsable | `title`, `subtitle`, `icon`, `trailing`, `onPress` |
-| `AppInput` | Campo con etiqueta visible, ayuda y error con ícono | `label`, `icon`, `helperText`, `errorText`, `required`, `isPassword` (botón ver/ocultar) |
-| `AppHeader` | Encabezado institucional de pantallas principales | `eyebrow` (rol), `title`, `subtitle`, `icon`, `action` (ícono + texto) |
-| `LoadingIndicator` | Carga con mensaje explícito | `message`, `fullScreen` |
-| `EmptyState` | Explica la ausencia de contenido y qué hacer | `icon`, `title`, `description`, `actionLabel` |
-| `StatusBadge` | Estado con color + ícono + texto | `status` (pending · in_progress · success · warning · error · info · neutral), `label` |
-| `AppText` *(soporte)* | Texto con la escala tipográfica | `variant`, `color`, `align` |
-| `AppIcon` *(soporte)* | Ícono único de la app | `name` (Material Symbols), `size`, `color` |
-| `ScreenContainer` *(soporte)* | Estructura de pantalla con área segura y scroll | `header`, `children` |
+**Iconografía:** `AppIcon` sobre `expo-symbols` (Material Symbols en Android). TypeScript valida los nombres.
 
-### Iconografía
-
-Se usa `AppIcon`, construido sobre `expo-symbols`, que **ya venía en la plantilla**. En Android muestra **Material Symbols**, la iconografía nativa de la plataforma, y la fuente se incluye en el bundle. Los nombres se consultan en https://fonts.google.com/icons y TypeScript valida que existan.
-Limitación: en iOS se necesitaría además el nombre del SF Symbol. No aplica, porque la app es solo para Android.
-
-### Accesibilidad aplicada
-
-- Roles y etiquetas accesibles (`accessibilityRole`, `accessibilityLabel`, `accessibilityState`) en todos los elementos interactivos.
-- Los errores y estados nunca dependen solo del color: siempre llevan ícono y texto.
-- La acción del encabezado ("Salir") muestra texto, no solo un ícono.
-- Los mensajes de error y de carga se anuncian a los lectores de pantalla (`accessibilityLiveRegion`).
+### Textos y desbordamientos (regla)
+- Nada se trunca: no hay `numberOfLines` ni `ellipsize` en la app. Nombres de recintos, mesas, candidatos y mensajes ocupan las líneas que necesiten.
+- En filas horizontales, el texto lleva `flexShrink: 1` / `minWidth: 0`, y los elementos secundarios (insignias, valores) pasan a la línea siguiente con `flexWrap` y un `flexBasis` mínimo para el texto principal.
+- Los botones crecen en alto y mantienen su mínimo táctil.
 
 ---
 
-## 3. Navegación y pantallas de demostración
+## 3. Navegación
+- Pantallas de inicio de cada rol: `AppHeader`. Pantallas internas: header nativo en tinta, sin sombra (`roleStackOptions`).
+- Transiciones nativas: `slide_from_right` en las pantallas internas y `fade` al pasar entre la autenticación y el panel del rol.
 
-- Las pantallas de inicio de cada rol ocultan el header nativo y usan `AppHeader`. Las pantallas internas futuras usarán el header nativo con los colores de la marca (`presentation/navigation/roleStackOptions.ts`).
-- **Login:** marca, formulario de correo y clave (solo estado local, sin autenticación) y, solo en desarrollo, una tarjeta para entrar como cada rol.
-- **Veedor:** estado vacío de mesas y una leyenda de los estados de envío (pendiente, enviando, enviada, falló).
-- **Coordinador de Recinto:** accesos a Veedores, Asignación de mesas y Actas, marcados como "Próximamente".
-- **Coordinador Provincial:** avance del escrutinio en estado vacío y gestión del territorio, marcada como "Próximamente".
+---
+
+## 4. Animaciones Lottie (RNF-06)
+
+Obra original del proyecto: diseñadas en **LottieFiles Creator** (motor de composición; la cuenta y el espacio de trabajo no estaban disponibles) y generadas con **`scripts/lottie/generar.js`** usando los colores de la paleta. Regenerar: `node scripts/lottie/generar.js assets/animaciones`. Se reproducen con `lottie-react-native ~7.3.8` (incluido en Expo Go SDK 57). Solo usan capas de forma, rectángulo, elipse, trazado, relleno, trazo (punteado), recorte de trazo y transformaciones.
+
+| JSON | Dónde | Cuándo | Duración |
+|---|---|---|---|
+| `emblema_login.json` | Login, recuperación y cambio de clave | Al abrir la pantalla | 1.8 s · una vez |
+| `gps_buscando.json` | Acta | Tras la foto, mientras se busca el GPS | 2.0 s · bucle |
+| `gps_ubicado.json` | Acta | Foto legible y ubicación registrada | 1.4 s · una vez |
+| `acta_sellada.json` | Acta | Acta guardada en el celular | 1.8 s · una vez |
+| `sincronizando.json` | Aviso de conexión (inicio del veedor, acta) | Envío en curso | 1.6 s · bucle |
+| `conflicto_resuelto.json` | Conflictos (**segunda etapa**) | Conflicto resuelto | 1.7 s · una vez |
+| `exito.json` / `error.json` | `Retroalimentacion` | Resultados genéricos | 1.5 s · una vez |
+
+Con **«reducir movimiento»** activado, las de una vez se muestran en su estado final y las de bucle, quietas. El estado siempre lo dice un texto al lado.
+
+---
+
+## 5. Accesibilidad aplicada
+- Roles y etiquetas accesibles en todo elemento interactivo; estados con texto, nunca solo color o movimiento.
+- Errores y procesos anunciados (`accessibilityLiveRegion`); las animaciones se ocultan al lector de pantalla.
+- «Reducir movimiento» respetado en Lottie, la sacudida, el botón y el esqueleto.

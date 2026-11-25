@@ -26,7 +26,7 @@ function RootNavigator() {
   const habilitado = estado === 'autenticado' && !debeCambiarClave;
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
       <Stack.Screen name="index" />
       {/* Destinos de enlaces de correo: siempre accesibles. */}
       <Stack.Screen name="restablecer-clave" />

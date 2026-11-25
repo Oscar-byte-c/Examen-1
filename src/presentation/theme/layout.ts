@@ -34,6 +34,13 @@ export const sizes = {
   iconLg: 32,
   iconXl: 48,
   maxContentWidth: 560,
+  /** Sello de estado del acta y animaciones Lottie. */
+  sello: 52,
+  lottieSm: 40,
+  lottieMd: 72,
+  lottieLg: 112,
+  /** Franja ocre del encabezado institucional. */
+  franja: 3,
 } as const;
 
 /** Bordes. */
@@ -45,12 +52,13 @@ export const borders = {
 /** Elevaciones sutiles (estilo institucional, sin sombras exageradas). */
 export const shadows = {
   none: {},
+  // Una sola elevación mínima: la separación principal la da el borde fino (estilo documento).
   card: {
-    elevation: 2,
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+    shadowColor: '#111B3D',
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
   },
   raised: {
     elevation: 4,
